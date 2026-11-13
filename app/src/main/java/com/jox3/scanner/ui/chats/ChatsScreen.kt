@@ -13,9 +13,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -33,6 +38,13 @@ fun ChatsScreen(
     onAlternarSeleccion: (Long) -> Unit,
     onEscanear: () -> Unit,
 ) {
+    var busqueda by remember { mutableStateOf("") }
+    val chatsFiltrados = if (busqueda.isBlank()) {
+        chats
+    } else {
+        chats.filter { it.titulo.contains(busqueda, ignoreCase = true) }
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
         Text("Elige los chats a escanear", fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Spacer2()
@@ -42,9 +54,17 @@ fun ChatsScreen(
             fontSize = 13.sp,
         )
         Spacer2()
+        OutlinedTextField(
+            value = busqueda,
+            onValueChange = { busqueda = it },
+            label = { Text("Buscar chat...") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer2()
 
         LazyColumn(modifier = Modifier.weight(1f)) {
-            items(chats, key = { it.id }) { chat ->
+            items(chatsFiltrados, key = { it.id }) { chat ->
                 FilaChat(
                     chat = chat,
                     marcado = chat.id in seleccionados,
@@ -81,6 +101,7 @@ private fun FilaChat(chat: ChatTelegram, marcado: Boolean, onClick: () -> Unit) 
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(chat.titulo, fontSize = 15.sp)
+                EtiquetaTipoChat(chat.tipo)
                 if (chat.mensajesAprox > 0) {
                     Text("${chat.mensajesAprox} mensajes aprox.", color = TextoSecundario, fontSize = 12.sp)
                 }

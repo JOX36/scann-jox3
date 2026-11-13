@@ -1,6 +1,7 @@
 package com.jox3.scanner.scan
 
 import com.jox3.scanner.scan.data.ChatTelegram
+import com.jox3.scanner.scan.data.TipoChat
 import kotlinx.coroutines.delay
 
 /**
@@ -18,11 +19,11 @@ class FakeChatsRepository : ChatsRepository {
     override suspend fun listarChats(): List<ChatTelegram> {
         delay(500)
         return listOf(
-            ChatTelegram(1, "📺 IPTV LATINO PREMIUM", 1240),
-            ChatTelegram(2, "👩‍🎤 G-PANDORA", 358),
-            ChatTelegram(3, "🔥 LISTAS M3U FREE", 902),
-            ChatTelegram(4, "🌎 TV GLOBAL MIX", 2140),
-            ChatTelegram(5, "⚽ DEPORTES HD", 410),
+            ChatTelegram(1, "📺 IPTV LATINO PREMIUM", TipoChat.GRUPO, 1240),
+            ChatTelegram(2, "👩‍🎤 G-PANDORA", TipoChat.GRUPO, 358),
+            ChatTelegram(3, "🔥 LISTAS M3U FREE", TipoChat.CANAL, 902),
+            ChatTelegram(4, "🌎 TV GLOBAL MIX", TipoChat.CANAL, 2140),
+            ChatTelegram(5, "⚽ DEPORTES HD", TipoChat.GRUPO, 410),
         )
     }
 }

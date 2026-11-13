@@ -30,7 +30,15 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         // script de Python lee los mensajes antes de validar cada enlace.
         val enlacesPorOrigen = mutableListOf<Pair<String, String>>()
         for (chat in chats) {
-            for (mensaje in obtenerMensajesRecientes(chat.id)) {
+            val mensajes = try {
+                obtenerMensajesRecientes(chat.id)
+            } catch (e: Exception) {
+                // Antes este error se tragaba en silencio y el chat
+                // simplemente "no encontraba nada" sin avisar por qué.
+                emit(EventoEscaneo.ErrorEnChat(chat.titulo, e.message ?: "error desconocido de TDLib"))
+                emptyList()
+            }
+            for (mensaje in mensajes) {
                 val texto = textoDelMensaje(mensaje)
                 if (texto.isBlank()) continue
                 extraerEnlaces(texto).forEach { enlace -> enlacesPorOrigen += chat.titulo to enlace }
@@ -63,14 +71,13 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
      * completo, para no hacer el escaneo demasiado lento en chats grandes).
      */
     private suspend fun obtenerMensajesRecientes(chatId: Long, limite: Int = LIMITE_MENSAJES): List<TdApi.Message> {
-        return try {
-            val resultado = sesion.enviarYEsperar(
-                TdApi.GetChatHistory(chatId, 0, 0, limite, false)
-            ) as? TdApi.Messages
-            resultado?.messages?.filterNotNull() ?: emptyList()
-        } catch (e: Exception) {
-            emptyList()
-        }
+        // Deja que cualquier error de TDLib se propague: quien llama decide
+        // qué hacer con él (ver [escanear], que lo convierte en un
+        // [EventoEscaneo.ErrorEnChat] visible en vez de tragárselo).
+        val resultado = sesion.enviarYEsperar(
+            TdApi.GetChatHistory(chatId, 0, 0, limite, false)
+        ) as? TdApi.Messages
+        return resultado?.messages?.filterNotNull() ?: emptyList()
     }
 
     /** Extrae el texto o el pie de foto/video/documento donde puede venir un enlace. */

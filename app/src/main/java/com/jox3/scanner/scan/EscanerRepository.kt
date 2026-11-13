@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.flow
 sealed class EventoEscaneo {
     data class Progreso(val procesados: Int, val total: Int) : EventoEscaneo()
     data class ListaEncontrada(val lista: ListaValidada) : EventoEscaneo()
+    /** Un chat no se pudo leer (error real de TDLib) — no detiene el escaneo de los demás. */
+    data class ErrorEnChat(val chatTitulo: String, val mensaje: String) : EventoEscaneo()
     object Finalizado : EventoEscaneo()
 }
 

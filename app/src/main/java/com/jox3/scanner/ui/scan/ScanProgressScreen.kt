@@ -27,7 +27,12 @@ import com.jox3.scanner.ui.theme.TextoSecundario
 
 /** Pantalla "Escaneo": progreso en vivo mientras se validan los enlaces encontrados. */
 @Composable
-fun ScanProgressScreen(procesados: Int, total: Int, encontradas: List<ListaValidada>) {
+fun ScanProgressScreen(
+    procesados: Int,
+    total: Int,
+    encontradas: List<ListaValidada>,
+    errores: List<String> = emptyList(),
+) {
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
         Text("Escaneando...", fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
@@ -44,6 +49,12 @@ fun ScanProgressScreen(procesados: Int, total: Int, encontradas: List<ListaValid
             color = TextoSecundario,
             fontSize = 13.sp,
         )
+
+        if (errores.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            PanelErrores(errores)
+        }
+
         Spacer(Modifier.height(20.dp))
 
         Text("Encontradas (${encontradas.size})", fontSize = 15.sp, fontWeight = FontWeight.Bold)
@@ -51,6 +62,29 @@ fun ScanProgressScreen(procesados: Int, total: Int, encontradas: List<ListaValid
 
         LazyColumn {
             items(encontradas) { lista -> FilaListaEncontrada(lista) }
+        }
+    }
+}
+
+/** Lista de chats que no se pudieron leer durante el escaneo (error real de TDLib). */
+@Composable
+internal fun PanelErrores(errores: List<String>) {
+    Surface(
+        color = SuperficieApp,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(
+                "No se pudieron leer ${errores.size} chat(s)",
+                color = ErrorApp,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(4.dp))
+            errores.forEach { error ->
+                Text("• $error", color = TextoSecundario, fontSize = 11.sp)
+            }
         }
     }
 }
