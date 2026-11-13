@@ -216,6 +216,32 @@ sirven el panel por `http://` plano.
       `parameter(...)` de Ktor, que codifica (%XX) el valor
       automáticamente antes de mandarlo, igual que un navegador.
 
+## Etapa 9: chats con "Temas" (forum topics) daban 0 de 0 siempre
+
+Después de las correcciones de la Etapa 8, un chat específico seguía
+dando "0 activas de 0" al instante y sin error, incluso confirmando que
+sus enlaces venían pegados como texto plano (no en archivos adjuntos) y
+con el formato exacto que la regex de extracción ya sabía reconocer
+(`http://host:80/get.php?username=...&password=...&type=m3u_plus`). La
+diferencia con los demás chats que sí funcionaban: este tenía **"Temas"
+activado** (la función de Telegram que divide un supergrupo en pestañas
+separadas, como "General", etc.).
+
+- [x] **`GetChatHistory` no basta para un chat con Temas**: cuando un
+      supergrupo tiene Temas activado, sus mensajes no se leen de forma
+      confiable con el historial "normal" del chat — cada tema se
+      comporta casi como un sub-chat aparte. Sin un manejo especial, el
+      escaneo solo veía (en el mejor de los casos) el tema "General", y
+      nunca los enlaces publicados en el resto de temas/secciones — la
+      causa real de que este chat en particular diera "0 de 0" mientras
+      otros chats normales ya encontraban enlaces sin problema.
+      Arreglado detectando primero si el chat es un supergrupo-foro
+      (`GetSupergroup(...).isForum`) y, si lo es, pidiendo la lista
+      completa de temas (`GetForumTopics`, paginada) y leyendo el
+      historial de cada uno por separado (`GetForumTopicHistory`, con el
+      mismo reintento ante páginas vacías que ya se usaba para
+      `GetChatHistory`) en vez de una sola llamada al historial general.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

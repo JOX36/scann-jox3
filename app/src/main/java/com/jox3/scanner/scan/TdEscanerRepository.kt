@@ -80,12 +80,32 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
      * mensajes" sin ser realmente así — esto era la causa real del "0
      * resultados, sin error, en menos de un segundo" que se reportó.
      *
-     * Ahora se pagina pidiendo página tras página (con [fromMessageId]
-     * apuntando siempre al mensaje más viejo ya recibido) hasta juntar
-     * [limite] mensajes, y si una página vuelve vacía se reintenta unas
-     * pocas veces antes de asumir que de verdad no hay más historial.
+     * Si el chat tiene "Temas" (forum topics) activado, [GetChatHistory] no
+     * es confiable para traer todo: cada tema se comporta casi como un
+     * sub-chat aparte y hace falta pedir la lista de temas y leer el
+     * historial de cada uno por separado (ver [obtenerMensajesDeForo]) —
+     * si no, el escaneo solo ve el tema "General" (o ni eso) y nunca los
+     * enlaces publicados en el resto de temas. Esto era la causa real de
+     * que un chat con "listas por secciones" diera "0 de 0" aunque otros
+     * chats normales ya funcionaran bien.
      */
     private suspend fun obtenerMensajesRecientes(chatId: Long, limite: Int = LIMITE_MENSAJES): List<TdApi.Message> {
+        if (esChatConTemas(chatId)) {
+            return obtenerMensajesDeForo(chatId, limite)
+        }
+        return obtenerMensajesDeHistorialNormal(chatId, limite)
+    }
+
+    /** `true` si el chat es un supergrupo con "Temas" (forum topics) activado. */
+    private suspend fun esChatConTemas(chatId: Long): Boolean {
+        val chat = sesion.enviarYEsperar(TdApi.GetChat(chatId)) as? TdApi.Chat ?: return false
+        val tipo = chat.type as? TdApi.ChatTypeSupergroup ?: return false
+        val supergrupo = sesion.enviarYEsperar(TdApi.GetSupergroup(tipo.supergroupId)) as? TdApi.Supergroup
+            ?: return false
+        return supergrupo.isForum
+    }
+
+    private suspend fun obtenerMensajesDeHistorialNormal(chatId: Long, limite: Int): List<TdApi.Message> {
         val mensajes = mutableListOf<TdApi.Message>()
         var fromMessageId = 0L
         var intentosVacios = 0
@@ -96,6 +116,72 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
             // un [EventoEscaneo.ErrorEnChat] visible en vez de tragárselo).
             val resultado = sesion.enviarYEsperar(
                 TdApi.GetChatHistory(chatId, fromMessageId, 0, LOTE_POR_PAGINA, false)
+            ) as? TdApi.Messages
+
+            val lote = resultado?.messages?.filterNotNull().orEmpty()
+
+            if (lote.isEmpty()) {
+                intentosVacios++
+                continue
+            }
+
+            intentosVacios = 0
+            mensajes += lote
+            fromMessageId = lote.last().id
+        }
+
+        return mensajes
+    }
+
+    /**
+     * Junta los mensajes de TODOS los temas del chat (incluido "General"),
+     * pidiendo primero la lista completa de temas ([GetForumTopics],
+     * paginada) y leyendo el historial de cada uno por separado
+     * ([GetForumTopicHistory], con el mismo reintento ante páginas vacías
+     * que [obtenerMensajesDeHistorialNormal]) — cada tema puede aportar
+     * hasta [limitePorTema] mensajes.
+     */
+    private suspend fun obtenerMensajesDeForo(chatId: Long, limitePorTema: Int): List<TdApi.Message> {
+        val mensajes = mutableListOf<TdApi.Message>()
+        for (temaId in obtenerIdsDeTemas(chatId)) {
+            mensajes += obtenerMensajesDeTema(chatId, temaId, limitePorTema)
+        }
+        return mensajes
+    }
+
+    private suspend fun obtenerIdsDeTemas(chatId: Long): List<Int> {
+        val ids = mutableListOf<Int>()
+        var offsetDate = 0
+        var offsetMessageId = 0L
+        var offsetTemaId = 0
+
+        while (true) {
+            val resultado = sesion.enviarYEsperar(
+                TdApi.GetForumTopics(chatId, "", offsetDate, offsetMessageId, offsetTemaId, LOTE_TEMAS)
+            ) as? TdApi.ForumTopics ?: break
+
+            val lote = resultado.topics?.filterNotNull().orEmpty()
+            if (lote.isEmpty()) break
+
+            ids += lote.map { it.info.forumTopicId }
+            if (lote.size < LOTE_TEMAS) break
+
+            offsetDate = resultado.nextOffsetDate
+            offsetMessageId = resultado.nextOffsetMessageId
+            offsetTemaId = resultado.nextOffsetForumTopicId
+        }
+
+        return ids
+    }
+
+    private suspend fun obtenerMensajesDeTema(chatId: Long, temaId: Int, limite: Int): List<TdApi.Message> {
+        val mensajes = mutableListOf<TdApi.Message>()
+        var fromMessageId = 0L
+        var intentosVacios = 0
+
+        while (mensajes.size < limite && intentosVacios < MAX_INTENTOS_VACIOS) {
+            val resultado = sesion.enviarYEsperar(
+                TdApi.GetForumTopicHistory(chatId, temaId, fromMessageId, 0, LOTE_POR_PAGINA)
             ) as? TdApi.Messages
 
             val lote = resultado?.messages?.filterNotNull().orEmpty()
@@ -128,5 +214,6 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         const val LIMITE_MENSAJES = 200
         const val LOTE_POR_PAGINA = 50
         const val MAX_INTENTOS_VACIOS = 5
+        const val LOTE_TEMAS = 100
     }
 }
