@@ -64,10 +64,8 @@ estándar de Android — nunca se instala nada en silencio.
 - [x] Pantalla única de primer arranque para guardar el API_ID / API_HASH de
       Telegram, cifrados en el dispositivo (`CredencialesApiTelegram`,
       sobre `security-crypto`).
-- [ ] `ChatsRepository` / `EscanerRepository` siguen siendo de prueba (ver
-      Etapa 3) — leer los chats y mensajes reales del usuario con TDLib
-      queda como el siguiente paso, ahora que la sesión ya se puede abrir
-      de verdad.
+- [x] `ChatsRepository` / `EscanerRepository` reales implementados en
+      Etapa 5, ver más abajo.
 
 ### Cómo se eligió integrar TDLib
 

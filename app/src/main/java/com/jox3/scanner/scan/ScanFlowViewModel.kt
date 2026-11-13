@@ -1,6 +1,7 @@
 package com.jox3.scanner.scan
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.jox3.scanner.scan.data.ChatTelegram
 import com.jox3.scanner.scan.engine.ListaValidada
@@ -86,4 +87,14 @@ class ScanFlowViewModel(
 
     /** Vuelve a la pantalla de selección de chats para escanear de nuevo. */
     fun reiniciar() = cargarChats()
+}
+
+class ScanFlowViewModelFactory(
+    private val chatsRepository: ChatsRepository,
+    private val escanerRepository: EscanerRepository,
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        return ScanFlowViewModel(chatsRepository, escanerRepository) as T
+    }
 }

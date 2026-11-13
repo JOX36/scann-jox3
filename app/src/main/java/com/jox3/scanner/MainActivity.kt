@@ -23,6 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jox3.scanner.scan.EstadoFlujoEscaneo
 import com.jox3.scanner.scan.ScanFlowViewModel
+import com.jox3.scanner.scan.ScanFlowViewModelFactory
+import com.jox3.scanner.scan.TdChatsRepository
+import com.jox3.scanner.scan.TdEscanerRepository
 import com.jox3.scanner.telegram.CredencialesApiTelegram
 import com.jox3.scanner.telegram.TdLibAuthClient
 import com.jox3.scanner.ui.chats.ChatsScreen
@@ -63,7 +66,7 @@ class MainActivity : ComponentActivity() {
                             val viewModel = viewModel<LoginViewModel>(factory = LoginViewModelFactory(authClient))
                             LoginScreen(viewModel = viewModel, onAutenticado = { autenticado = true })
                         } else {
-                            PantallaPrincipal()
+                            PantallaPrincipal(authClient)
                         }
                     }
                 }
@@ -73,7 +76,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun PantallaPrincipal() {
+private fun PantallaPrincipal(authClient: TdLibAuthClient) {
     val updateViewModel: UpdateViewModel = viewModel()
     val estadoActualizacion by updateViewModel.estado.collectAsState()
 
@@ -100,13 +103,17 @@ private fun PantallaPrincipal() {
                 lanzadorAjustesPermiso.launch(updateViewModel.intentSolicitarPermiso())
             },
         )
-        PantallaEscaneo()
+        PantallaEscaneo(authClient)
     }
 }
 
 @Composable
-private fun PantallaEscaneo() {
-    val viewModel: ScanFlowViewModel = viewModel()
+private fun PantallaEscaneo(authClient: TdLibAuthClient) {
+    val chatsRepository = remember { TdChatsRepository(authClient) }
+    val escanerRepository = remember { TdEscanerRepository(authClient) }
+    val viewModel: ScanFlowViewModel = viewModel(
+        factory = ScanFlowViewModelFactory(chatsRepository, escanerRepository),
+    )
     val estado by viewModel.estado.collectAsState()
 
     when (val s = estado) {

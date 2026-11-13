@@ -5,9 +5,11 @@ import android.os.Build
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import java.util.Locale
+import kotlin.coroutines.resume
 
 /**
  * Implementación real de [TelegramAuthClient] contra TDLib, usando la
@@ -119,6 +121,28 @@ class TdLibAuthClient(
     private fun manejarPosibleError(resultado: TdApi.Object) {
         if (resultado is TdApi.Error) {
             _estado.value = TelegramAuthState.Error(resultado.message ?: "Error desconocido de Telegram")
+        }
+    }
+
+    /**
+     * Envía cualquier petición de TDLib y espera su respuesta como una
+     * suspend fun normal, en vez del callback crudo de [Client.send]. La
+     * usan las implementaciones reales de escaneo (listar chats, leer
+     * historial) sobre esta misma sesión ya autenticada — no abren un
+     * segundo Client.
+     */
+    suspend fun enviarYEsperar(peticion: TdApi.Function<*>): TdApi.Object = suspendCancellableCoroutine { continuacion ->
+        val clienteActual = cliente
+        if (clienteActual == null) {
+            continuacion.resumeWithException(IllegalStateException("TDLib no está conectado todavía."))
+            return@suspendCancellableCoroutine
+        }
+        clienteActual.send(peticion) { resultado ->
+            if (resultado is TdApi.Error) {
+                continuacion.resumeWithException(RuntimeException(resultado.message ?: "Error de Telegram"))
+            } else {
+                continuacion.resume(resultado)
+            }
         }
     }
 }
