@@ -2,10 +2,12 @@ package com.jox3.scanner.telegram
 
 import android.content.Context
 import android.os.Build
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
 import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import java.util.Locale
@@ -132,22 +134,40 @@ class TdLibAuthClient(
      * historial) sobre esta misma sesión ya autenticada — no abren un
      * segundo Client.
      */
-    suspend fun enviarYEsperar(peticion: TdApi.Function<*>): TdApi.Object = suspendCancellableCoroutine { continuacion ->
-        val clienteActual = cliente
-        if (clienteActual == null) {
-            continuacion.resumeWithException(IllegalStateException("TDLib no está conectado todavía."))
-            return@suspendCancellableCoroutine
-        }
-        clienteActual.send(peticion) { resultado ->
-            if (resultado is TdApi.Error) {
-                continuacion.resumeWithException(RuntimeException(resultado.message ?: "Error de Telegram"))
-            } else {
-                continuacion.resume(resultado)
+    suspend fun enviarYEsperar(peticion: TdApi.Function<*>): TdApi.Object {
+        // Sin timeout, si TDLib nunca llama al callback para alguna
+        // petición (visto en la práctica con GetForumTopics/
+        // GetForumTopicHistory en ciertos chats) el escaneo se queda
+        // pegado para siempre sin ningún error visible — el mismo tipo
+        // de problema que ya se arregló del lado de las validaciones
+        // Xtream, pero acá del lado de TDLib.
+        return try {
+            withTimeout(TIMEOUT_TDLIB_MS) {
+                suspendCancellableCoroutine { continuacion ->
+                    val clienteActual = cliente
+                    if (clienteActual == null) {
+                        continuacion.resumeWithException(IllegalStateException("TDLib no está conectado todavía."))
+                        return@suspendCancellableCoroutine
+                    }
+                    clienteActual.send(peticion) { resultado ->
+                        if (resultado is TdApi.Error) {
+                            continuacion.resumeWithException(RuntimeException(resultado.message ?: "Error de Telegram"))
+                        } else {
+                            continuacion.resume(resultado)
+                        }
+                    }
+                }
             }
+        } catch (e: TimeoutCancellationException) {
+            throw RuntimeException(
+                "TDLib no respondió en ${TIMEOUT_TDLIB_MS / 1000}s a ${peticion::class.simpleName}"
+            )
         }
     }
 
     companion object {
+        private const val TIMEOUT_TDLIB_MS = 15_000L
+
         @Volatile
         private var instancia: TdLibAuthClient? = null
 

@@ -291,6 +291,27 @@ nunca y sin ningún error visible.
       arreglo: `HttpTimeout` de 10s en Ktor y validación en paralelo con
       un `Semaphore(50)`.
 
+## Etapa 10 bis: el escaneo se quedaba pegado en "Buscando enlaces en los mensajes..." para siempre
+
+Un tercer bug de "se queda pegado", distinto a los dos anteriores (que ya
+estaban en la fase de VALIDAR enlaces): este pasaba ANTES, mientras
+todavía se estaban juntando los mensajes de los chats elegidos — la app
+se quedaba en "Encontradas (0)" sin avanzar ni dar ningún error, durante
+más de 5 minutos.
+
+- [x] **`enviarYEsperar` (TDLib) sin timeout**: igual que `NetworkModule`
+      no tenía timeout para las conexiones HTTP a los paneles Xtream
+      (Etapa 9 bis), la función que espera la respuesta de TDLib a
+      cualquier petición tampoco tenía ninguno. Si TDLib nunca llama al
+      callback para una petición puntual — visto en la práctica con
+      `GetForumTopics`/`GetForumTopicHistory` en algunos chats — la
+      corrutina se queda esperando para siempre y el escaneo entero no
+      avanza, sin ningún mensaje de error visible. Arreglado con
+      `withTimeout(15s)` alrededor de la espera; si se cumple el plazo,
+      ese chat puntual se reporta como error (ver "Chats con error" en
+      la pantalla de escaneo) y el escaneo sigue con el resto de chats en
+      vez de quedarse trabado para siempre.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
