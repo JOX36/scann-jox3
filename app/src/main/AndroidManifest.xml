@@ -2,6 +2,15 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!--
+        Requerido para poder abrir la pantalla estándar de instalación de un
+        .apk descargado por la propia app (actualizaciones automáticas).
+        El usuario sigue confirmando la instalación manualmente; este
+        permiso solo habilita que Android le muestre esa pantalla cuando
+        viene de un instalador que no es Google Play.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application
         android:allowBackup="false"
         android:label="IPTV Scanner"
@@ -15,6 +24,29 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            Expone el .apk descargado al instalador del sistema. Ver
+            res/xml/file_paths.xml para la carpeta compartida.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Recibe el aviso del sistema cuando termina la descarga del .apk. -->
+        <receiver
+            android:name="com.jox3.scanner.update.UpdateDownloadReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

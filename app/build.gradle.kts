@@ -46,6 +46,10 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
     implementation("androidx.navigation:navigation-compose:2.8.1")
 
+    // core-ktx: FileProvider y utilidades Kotlin básicas de AndroidX.
+    // Usado por las actualizaciones automáticas (DescargadorActualizacion).
+    implementation("androidx.core:core-ktx:1.13.1")
+
     // Almacenamiento seguro de credenciales (API_ID/API_HASH/BOT_TOKEN),
     // equivalente al .env del script de Python pero cifrado en el dispositivo.
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
