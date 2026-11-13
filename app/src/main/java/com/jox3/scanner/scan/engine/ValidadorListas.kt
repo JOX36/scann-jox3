@@ -1,6 +1,8 @@
 package com.jox3.scanner.scan.engine
 
 import com.jox3.scanner.scan.data.CredencialesXtream
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 /**
  * Resultado final de validar y clasificar un enlace encontrado. Los campos
@@ -21,6 +23,13 @@ data class ListaValidada(
     val esPrueba: Boolean = false,
     val zonaHoraria: String? = null,
     val cantidadCanales: Int? = null,
+    val cantidadPeliculas: Int? = null,
+    val cantidadSeries: Int? = null,
+    val fechaVencimiento: String? = null,
+    val fechaCreacion: String? = null,
+    val formatos: String? = null,
+    /** IP real del servidor cuando [credenciales].host es un dominio — ver [XtreamClient.resolverIp]. */
+    val direccionIp: String? = null,
 )
 
 /** Muestra de nombres de canal usada para la detección LATAM — igual al `limite` que usaba Python. */
@@ -40,8 +49,27 @@ suspend fun validarYEnriquecer(cred: CredencialesXtream, origenChat: String): Li
         return ListaValidada(cred, activa = false, esLatino = false, porcentajeLatino = 0.0, origenChat = origenChat)
     }
 
-    val categorias = XtreamClient.obtenerCategorias(cred)
-    val canales = XtreamClient.obtenerCanales(cred)
+    // En paralelo (como ya hacía `obtenerCategorias` internamente): cada
+    // llamada de red extra que se agregó acá (películas, series, IP) sería
+    // una espera secuencial más por cada enlace si se hiciera una por una,
+    // y con hasta 50 enlaces validándose a la vez eso suma rápido.
+    lateinit var categorias: List<String>
+    lateinit var canales: List<String>
+    var peliculas: Int?
+    var series: Int?
+    var ip: String?
+    coroutineScope {
+        val categoriasAsync = async { XtreamClient.obtenerCategorias(cred) }
+        val canalesAsync = async { XtreamClient.obtenerCanales(cred) }
+        val peliculasAsync = async { XtreamClient.obtenerCantidadPeliculas(cred) }
+        val seriesAsync = async { XtreamClient.obtenerCantidadSeries(cred) }
+        val ipAsync = async { XtreamClient.resolverIp(cred.host) }
+        categorias = categoriasAsync.await()
+        canales = canalesAsync.await()
+        peliculas = peliculasAsync.await()
+        series = seriesAsync.await()
+        ip = ipAsync.await()
+    }
     var (esLatino, porcentaje) = esContenidoLatino(categorias)
 
     if (!esLatino && canales.isNotEmpty()) {
@@ -62,5 +90,11 @@ suspend fun validarYEnriquecer(cred: CredencialesXtream, origenChat: String): Li
         esPrueba = info.esPrueba,
         zonaHoraria = info.zonaHoraria,
         cantidadCanales = canales.size.takeIf { it > 0 },
+        cantidadPeliculas = peliculas,
+        cantidadSeries = series,
+        fechaVencimiento = info.fechaVencimiento,
+        fechaCreacion = info.fechaCreacion,
+        formatos = info.formatos,
+        direccionIp = ip,
     )
 }

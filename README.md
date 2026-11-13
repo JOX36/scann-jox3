@@ -428,6 +428,42 @@ real del chat.
   en vez de unas pocas) — es el mismo trade-off que ya asume el script
   de Python con su propio límite de 10000.
 
+## Etapa 13: resultados con el mismo formato decorado de Python + IP alternativa del servidor
+
+Dos pedidos explícitos del usuario tras ver que el escaneo ya encuentra
+mucho más contenido (Etapa 12): el texto que exporta/manda la app
+("Guardar .txt" / "Enviar a Telegram") se veía plano, muy distinto del
+formato con emojis que el script de Python escribe en `OUTPUT_FILE`
+(`print_scan_summary()`), que es el que el usuario prefiere; y quiso
+saber si, para una lista encontrada por nombre de dominio, también se
+puede mostrar la IP real del servidor como alternativa.
+
+- [x] `ResultadosExportador.generarContenido()` ahora arma, por cada
+      lista activa, el mismo bloque decorado que Python — mismo orden y
+      mismos emojis (🎉 host, usuario, contraseña, estado, conexiones,
+      canales, series, películas, fecha de creación, vencimiento, días
+      restantes, timezone, si es prueba, formatos permitidos, enlace
+      M3U, enlace EPG, fecha de escaneo) — en vez del formato plano que
+      tenía antes. Afecta a la vez "Guardar .txt" y "Enviar a Telegram"
+      porque los dos ya pasaban por esta misma función.
+- [x] Para traer series/películas/fecha de creación/formatos permitidos,
+      que la app todavía no pedía, se agregaron al panel Xtream
+      (`XtreamClient`): `created_at`/`allowed_output_formats` en
+      `player_api.php`, y conteo de `get_vod_streams`/`get_series` —
+      igual que hace Python en `validate_m3u_url()`/`fetch_stream_count()`.
+      Las cinco llamadas nuevas de red por enlace (categorías, canales,
+      películas, series, IP) se piden en paralelo, no una por una, para
+      no sumarle tiempo extra al escaneo con muchos enlaces a la vez.
+- [x] IP alternativa del servidor (pedido nuevo, sin equivalente en el
+      script de Python): cuando el host de la lista es un dominio (no ya
+      una IP), `XtreamClient.resolverIp()` hace una resolución DNS
+      (`InetAddress.getByName`, con tope de 4s para no trabar el
+      escaneo si el DNS está lento/caído) y, si la consigue, se agrega
+      como línea "IP del servidor (alternativa)" en el archivo
+      exportado y como dato extra en la fila de cada lista en
+      Resultados. Si el host YA es una IP, no se muestra nada (no hay
+      nada que "alternar").
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

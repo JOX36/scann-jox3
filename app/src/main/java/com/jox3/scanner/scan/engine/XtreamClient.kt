@@ -5,11 +5,19 @@ import com.jox3.scanner.update.NetworkModule
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import java.net.InetAddress
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 @Serializable
 private data class RespuestaCuenta(
@@ -32,10 +40,19 @@ private data class InfoUsuario(
     val auth: Int? = null,
     val status: String? = null,
     val exp_date: JsonElement? = null,
+    val created_at: JsonElement? = null,
     val active_cons: JsonElement? = null,
     val max_connections: JsonElement? = null,
     val is_trial: JsonElement? = null,
+    val allowed_output_formats: List<String>? = null,
 )
+
+/** Mismo formato que usa `print_scan_summary()` en Python (`strftime('%Y-%m-%d %H:%M')`, en UTC). */
+private val formateadorFecha = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneOffset.UTC)
+
+/** `exp_date`/`created_at` llegan como timestamp Unix (segundos) en texto; `null` si el panel no lo da. */
+private fun JsonElement?.comoFechaUtc(): String? =
+    this.comoTexto()?.toLongOrNull()?.let { segundos -> formateadorFecha.format(Instant.ofEpochSecond(segundos)) }
 
 private fun JsonElement?.comoTexto(): String? = (this as? JsonPrimitive)?.content
 
@@ -61,6 +78,9 @@ data class InfoCuentaXtream(
     val conexionesMax: Int?,
     val esPrueba: Boolean,
     val zonaHoraria: String?,
+    val fechaVencimiento: String? = null,
+    val fechaCreacion: String? = null,
+    val formatos: String? = null,
 )
 
 /**
@@ -109,6 +129,10 @@ object XtreamClient {
                 conexionesMax = info.max_connections.comoTexto()?.toIntOrNull(),
                 esPrueba = info.is_trial.comoTexto() == "1",
                 zonaHoraria = respuesta.server_info?.timezone,
+                fechaVencimiento = info.exp_date.comoFechaUtc(),
+                fechaCreacion = info.created_at.comoFechaUtc(),
+                formatos = info.allowed_output_formats?.takeIf { it.isNotEmpty() }
+                    ?.joinToString(", ") { it.lowercase() },
             )
         }.getOrNull()
     }
@@ -152,4 +176,70 @@ object XtreamClient {
             canales.mapNotNull { it.name }
         }.getOrDefault(emptyList())
     }
+
+    /**
+     * Cantidad de elementos de `get_vod_streams`/`get_series` — igual que
+     * `fetch_stream_count()` en Python: no interesa el contenido de cada
+     * elemento, solo cuántos hay, así que se decodifica como lista de
+     * [JsonElement] genérico para no depender de la forma exacta que use
+     * cada panel.
+     */
+    private suspend fun contarStream(cred: CredencialesXtream, accion: String): Int? {
+        return runCatching {
+            val elementos: List<JsonElement> = NetworkModule.cliente.get(urlPlayerApi(cred)) {
+                parameter("username", cred.username)
+                parameter("password", cred.password)
+                parameter("action", accion)
+            }.body()
+            elementos.size
+        }.getOrNull()
+    }
+
+    /** Cantidad de películas (VOD) del panel — equivalente a `movies` en Python. */
+    suspend fun obtenerCantidadPeliculas(cred: CredencialesXtream): Int? = contarStream(cred, "get_vod_streams")
+
+    /** Cantidad de series del panel — equivalente a `series` en Python. */
+    suspend fun obtenerCantidadSeries(cred: CredencialesXtream): Int? = contarStream(cred, "get_series")
+
+    /** Tope de espera para la resolución DNS — no debe bloquear el resto del escaneo si el DNS está lento o caído. */
+    private const val TIMEOUT_DNS_MS = 4_000L
+
+    /**
+     * Resuelve la IP real del servidor detrás del host de la lista (pedido
+     * explícito del usuario: "quisiera saber si también se puede incluir la
+     * dirección IP como alternativa"). El script de Python no hace esto —
+     * es una funcionalidad nueva, solo para la app.
+     *
+     * Devuelve `null` si [host] YA es una dirección IP literal (no hay
+     * nada que "resolver": la IP ya es la que se está usando, mostrarla de
+     * nuevo como "alternativa" no agrega información), si no se pudo
+     * resolver (dominio caído, DNS lento/caído) o si tardó más de
+     * [TIMEOUT_DNS_MS].
+     */
+    suspend fun resolverIp(host: String): String? {
+        val sinEsquema = host.substringAfter("://").substringBefore("/").substringBefore(":")
+        if (sinEsquema.isBlank() || esDireccionIpLiteral(sinEsquema)) return null
+
+        return withTimeoutOrNull(TIMEOUT_DNS_MS) {
+            withContext(Dispatchers.IO) {
+                try {
+                    InetAddress.getByName(sinEsquema).hostAddress
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        }
+    }
+
+    private val patronIpv4 = Regex("""^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$""")
+
+    /**
+     * IPv4 ("192.168.0.1") literal — ya es la IP, no un nombre de dominio.
+     * (El puerto, si lo hay, ya se recortó antes de llamar a esta función;
+     * IPv6 no se maneja — ni acá ni en [extraerCredencialesXtream] — por
+     * ser un caso prácticamente inexistente en paneles Xtream.)
+     */
+    private fun esDireccionIpLiteral(host: String): Boolean = patronIpv4.matches(host)
 }

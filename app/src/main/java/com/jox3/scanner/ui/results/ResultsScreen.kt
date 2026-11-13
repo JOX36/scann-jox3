@@ -213,6 +213,10 @@ internal fun FilaResultado(lista: ListaValidada) {
                 Spacer(Modifier.height(4.dp))
                 Text("🌎 LATAM · ${(lista.porcentajeLatino * 100).toInt()}%", color = AcentoApp, fontSize = 12.sp)
             }
+            if (!lista.direccionIp.isNullOrBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text("🧭 IP alternativa: ${lista.direccionIp}", color = TextoSecundario, fontSize = 11.sp)
+            }
             Text("Origen: ${lista.origenChat}", color = TextoSecundario, fontSize = 11.sp)
         }
     }

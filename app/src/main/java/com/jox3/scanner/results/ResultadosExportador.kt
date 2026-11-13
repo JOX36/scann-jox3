@@ -5,6 +5,10 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import com.jox3.scanner.scan.engine.ListaValidada
 import java.io.File
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * Genera el archivo de resultados y lo comparte (botón "Guardar .txt" /
@@ -14,6 +18,21 @@ import java.io.File
  */
 object ResultadosExportador {
 
+    private val formateadorEscaneo = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneOffset.UTC)
+
+    /**
+     * Mismo formato decorado con emojis que escribe `print_scan_summary()`
+     * en el script de Python (ver `OUTPUT_FILE` ahí) — pedido explícito del
+     * usuario: el texto que llegaba a Telegram antes se veía así, y
+     * prefiere ese formato al que tenía la app. Un bloque por lista,
+     * campo por campo en el mismo orden/emoji que Python; "N/A" o "No
+     * especificada" cuando el panel no dio ese dato, igual que allá.
+     *
+     * La línea de IP es la única que Python no tiene: es la función nueva
+     * que pidió el usuario (ver [com.jox3.scanner.scan.engine.XtreamClient.resolverIp]) —
+     * se agrega solo cuando se pudo resolver, como "alternativa" al host
+     * por dominio, nunca inventada.
+     */
     fun generarContenido(listas: List<ListaValidada>): String {
         val activas = listas.filter { it.activa }
         val latam = activas.filter { it.esLatino }
@@ -21,30 +40,42 @@ object ResultadosExportador {
         builder.appendLine("IPTV Super Scanner — Resultados")
         builder.appendLine("${activas.size} activas de ${listas.size} validadas · ${latam.size} de LATAM")
         builder.appendLine("=".repeat(60))
+        builder.appendLine()
+
+        val escaneadoEn = formateadorEscaneo.format(Instant.now())
 
         activas.forEach { lista ->
+            val cred = lista.credenciales
+            val epgLink = "${cred.host}/xmltv.php?username=${cred.username}&password=${cred.password}"
+            val conexiones = if (lista.conexionesMax != null) {
+                "${lista.conexionesActivas ?: "N/A"}/${lista.conexionesMax}"
+            } else "N/A"
+
+            builder.appendLine("🎉 === Resultado M3U por JOX3 === 🎉")
+            builder.appendLine("🌐 Host: ${cred.host}")
+            if (lista.direccionIp != null) {
+                builder.appendLine("🧭 IP del servidor (alternativa): ${lista.direccionIp}")
+            }
+            val porcentajeLatam = String.format(Locale.US, "%.1f", lista.porcentajeLatino * 100)
+            builder.appendLine("🌎 Contenido LATAM: $porcentajeLatam% de las categorías")
+            builder.appendLine("👤 Usuario: ${cred.username}")
+            builder.appendLine("🔑 Contraseña: ${cred.password}")
+            builder.appendLine("✅ Estado: ${if (lista.activa) "Active" else "N/A"}")
+            builder.appendLine("🔗 Conexiones: $conexiones")
+            builder.appendLine("📺 Canales: ${lista.cantidadCanales ?: "N/A"}")
+            builder.appendLine("🎬 Series: ${lista.cantidadSeries ?: "N/A"}")
+            builder.appendLine("🎞️ Películas: ${lista.cantidadPeliculas ?: "N/A"}")
+            builder.appendLine("📅 Creado: ${lista.fechaCreacion ?: "No especificada"}")
+            builder.appendLine("⏰ Vencimiento: ${lista.fechaVencimiento ?: "No especificada"}")
+            builder.appendLine("⏳ Días restantes: ${lista.diasRestantes ?: "N/A"}")
+            builder.appendLine("📍 Timezone: ${lista.zonaHoraria ?: "N/A"}")
+            builder.appendLine("🧪 Prueba: ${if (lista.esPrueba) "Sí" else "No"}")
+            builder.appendLine("📡 Formatos: ${lista.formatos ?: "N/A"}")
+            builder.appendLine("📺 Enlace M3U: ${cred.urlOriginal}")
+            builder.appendLine("📝 Enlace EPG: $epgLink")
+            builder.appendLine("🔎 Escaneado: $escaneadoEn")
+            builder.appendLine("📂 Encontrada en: ${lista.origenChat}")
             builder.appendLine()
-            builder.appendLine(lista.credenciales.urlOriginal)
-            builder.appendLine("  Host: ${lista.credenciales.host}")
-            builder.appendLine("  Usuario: ${lista.credenciales.username}")
-            builder.appendLine("  Contraseña: ${lista.credenciales.password}")
-            val vencimiento = when {
-                lista.diasRestantes == null -> "No especificada"
-                lista.diasRestantes < 0 -> "Vencida"
-                else -> "${lista.diasRestantes} días restantes"
-            }
-            builder.appendLine("  Vencimiento: $vencimiento")
-            if (lista.conexionesMax != null) {
-                builder.appendLine("  Conexiones: ${lista.conexionesActivas ?: 0}/${lista.conexionesMax}")
-            }
-            if (lista.cantidadCanales != null) {
-                builder.appendLine("  Canales: ${lista.cantidadCanales}")
-            }
-            if (!lista.zonaHoraria.isNullOrBlank()) {
-                builder.appendLine("  Zona horaria del servidor: ${lista.zonaHoraria}")
-            }
-            builder.appendLine("  Contenido LATAM: ${if (lista.esLatino) "Sí (${(lista.porcentajeLatino * 100).toInt()}%)" else "No"}")
-            builder.appendLine("  Encontrada en: ${lista.origenChat}")
         }
 
         return builder.toString()
