@@ -9,16 +9,41 @@ android {
     namespace = "com.jox3.scanner"
     compileSdk = 35
 
+    // CI pasa el número de build de GitHub Actions (GITHUB_RUN_NUMBER) para
+    // que cada build tenga una versión distinta y creciente — así la app
+    // puede saber de verdad si ya está actualizada o no, en vez de comparar
+    // siempre contra el mismo "0.1.0" fijo.
+    val numeroDeBuild = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+
     defaultConfig {
         applicationId = "com.jox3.scanner"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = numeroDeBuild
+        versionName = "0.1.$numeroDeBuild"
+    }
+
+    // Firma fija para los builds de debug: sin esto, cada máquina (o cada
+    // runner de CI, que es nuevo en cada ejecución) genera su propia
+    // keystore de debug, así que cada build queda firmado con una llave
+    // distinta. Android no permite instalar un APK "encima" de otro firmado
+    // con otra llave — hay que desinstalar primero, lo que borra las
+    // credenciales de Telegram guardadas y la sesión de TDLib, obligando a
+    // volver a escribir el API_ID/API_HASH y a iniciar sesión de nuevo en
+    // cada instalación. Con una keystore fija y versionCode creciente, las
+    // siguientes actualizaciones se instalan "encima" sin perder nada.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = rootProject.file("keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {

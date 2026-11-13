@@ -64,10 +64,8 @@ estándar de Android — nunca se instala nada en silencio.
 - [x] Pantalla única de primer arranque para guardar el API_ID / API_HASH de
       Telegram, cifrados en el dispositivo (`CredencialesApiTelegram`,
       sobre `security-crypto`).
-- [ ] `ChatsRepository` / `EscanerRepository` siguen siendo de prueba (ver
-      Etapa 3) — leer los chats y mensajes reales del usuario con TDLib
-      queda como el siguiente paso, ahora que la sesión ya se puede abrir
-      de verdad.
+- [x] `ChatsRepository` / `EscanerRepository` reales implementados en
+      Etapa 5, ver más abajo.
 
 ### Cómo se eligió integrar TDLib
 
@@ -89,6 +87,33 @@ Telegram): se crean gratis, una sola vez, en
 [my.telegram.org/apps](https://my.telegram.org/apps). La primera vez que
 abras la app te va a pedir el API ID y el API Hash — se guardan cifrados en
 el teléfono y no se vuelven a pedir.
+
+## Firma estable y actualizaciones automáticas reales
+
+Hasta ahora cada build de CI quedaba firmado con una keystore de debug
+distinta (cada runner de GitHub Actions es una máquina nueva, así que
+generaba una keystore nueva cada vez). Android no permite instalar un APK
+"encima" de otro firmado con otra llave, así que cada instalación nueva
+exigía desinstalar primero — y eso borraba el API_ID/API_HASH guardados y
+la sesión de TDLib, obligando a volver a escribirlos y a iniciar sesión de
+nuevo cada vez.
+
+- [x] Keystore de debug fija, incluida en el repo (`keystore/debug.keystore`,
+      sin datos sensibles — es solo una firma de desarrollo, no la cuenta de
+      Google Play). A partir de este cambio, instalar un build nuevo
+      actualiza la app sin perder las credenciales ni la sesión. **Nota**:
+      esta primera vez sí hay que desinstalar manualmente la versión
+      anterior una única vez, porque quedó firmada con una llave distinta a
+      la fija.
+- [x] `versionName`/`versionCode` ya no quedan fijos en "0.1.0": CI los
+      genera con el número de build de GitHub Actions (`0.1.<run_number>`),
+      así que cada build es "más nueva" de verdad que la anterior y la app
+      puede saber si ya está al día.
+- [x] El workflow de CI ahora publica un **Release de GitHub** con el `.apk`
+      adjunto en cada `push` (no en PRs abiertas todavía sin mergear) — de
+      ahí es de donde `UpdateManager.kt` (Etapa 2) busca actualizaciones. Sin
+      este paso, el código de auto-actualización estaba listo pero nunca
+      tenía nada que encontrar.
 
 ## Nota sobre el CI
 

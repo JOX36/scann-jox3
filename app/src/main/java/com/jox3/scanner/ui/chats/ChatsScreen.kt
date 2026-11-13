@@ -81,7 +81,9 @@ private fun FilaChat(chat: ChatTelegram, marcado: Boolean, onClick: () -> Unit) 
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(chat.titulo, fontSize = 15.sp)
-                Text("${chat.mensajesAprox} mensajes aprox.", color = TextoSecundario, fontSize = 12.sp)
+                if (chat.mensajesAprox > 0) {
+                    Text("${chat.mensajesAprox} mensajes aprox.", color = TextoSecundario, fontSize = 12.sp)
+                }
             }
             Checkbox(checked = marcado, onCheckedChange = { onClick() })
         }

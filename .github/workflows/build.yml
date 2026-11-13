@@ -2,8 +2,10 @@ name: Build
 
 on:
   push:
-    branches: [main]
   pull_request:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -25,3 +27,20 @@ jobs:
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      # Solo en push (no en PRs abiertas): publica un release de GitHub con
+      # el APK adjunto. De ahí es de donde la app lee la comprobación de
+      # actualizaciones automáticas (ver UpdateManager.kt) — sin este paso
+      # nunca hay nada que encontrar, aunque el código de auto-actualización
+      # ya estuviera listo desde la Etapa 2.
+      - name: Publicar release con el APK (solo en push)
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="0.1.${{ github.run_number }}"
+          gh release create "v$VERSION" app/build/outputs/apk/debug/app-debug.apk \
+            --repo "${{ github.repository }}" \
+            --title "Build automático v$VERSION" \
+            --notes "Build automático desde el commit ${{ github.sha }} (rama ${{ github.ref_name }})." \
+            --prerelease
