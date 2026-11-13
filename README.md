@@ -16,10 +16,9 @@ Proyecto separado de iptv-exo (el reproductor); este solo escanea y valida.
 - [x] Estructura base del proyecto (Compose + Kotlin + Gradle)
 - [x] Flujo de login (teléfono → código → opcional contraseña 2FA)
 - [x] Almacenamiento seguro de credenciales listo para usarse (`security-crypto`)
-- [ ] **Integración real con Telegram (TDLib)** — por ahora el login usa
-      `FakeTelegramAuthClient`, una implementación de prueba que simula los
-      tiempos de red (acepta cualquier teléfono y el código `12345`), para
-      poder probar y ajustar toda la UI sin depender de la build nativa.
+- [x] **Integración real con Telegram (TDLib)** — implementada en Etapa 4,
+      ver más abajo. `FakeTelegramAuthClient` queda en el repo sin usarse por
+      defecto (sirve de referencia / para pruebas de UI).
 
 ## Estado actual (Etapa 2)
 
@@ -56,16 +55,40 @@ estándar de Android — nunca se instala nada en silencio.
       validación contra un panel de verdad). Se reemplazan por
       implementaciones con TDLib sin tocar las pantallas ni el motor.
 
-## Por qué TDLib queda pendiente como paso aparte
+## Estado actual (Etapa 4)
+
+- [x] Login real contra Telegram con TDLib (`TdLibAuthClient`), reemplazando
+      `FakeTelegramAuthClient` como implementación por defecto en
+      `MainActivity.kt` — la interfaz `TelegramAuthClient` no cambió, así
+      que las pantallas de login no se tocaron.
+- [x] Pantalla única de primer arranque para guardar el API_ID / API_HASH de
+      Telegram, cifrados en el dispositivo (`CredencialesApiTelegram`,
+      sobre `security-crypto`).
+- [ ] `ChatsRepository` / `EscanerRepository` siguen siendo de prueba (ver
+      Etapa 3) — leer los chats y mensajes reales del usuario con TDLib
+      queda como el siguiente paso, ahora que la sesión ya se puede abrir
+      de verdad.
+
+### Cómo se eligió integrar TDLib
 
 TDLib es la librería oficial de Telegram para actuar como una cuenta de
-usuario (no un bot) — es la única opción madura para esto en Android. Pero
-su build real (CMake + NDK, generación de `TdApi.java` desde `td_api.tl`)
-depende de decisiones concretas (versión del submódulo, binario propio vs.
-precompilado) que conviene resolver juntos y verificar que compila, en vez
-de dejar una configuración adivinada que podría no funcionarte. La interfaz
-`TelegramAuthClient` ya está lista para recibir esa implementación real
-(`TdLibAuthClient`) sin tocar la UI.
+usuario (no un bot) — es la única opción madura para esto en Android.
+Compilarla desde cero (CMake + NDK, generación de `TdApi.java` desde
+`td_api.tl`) no se puede verificar en este entorno de desarrollo (sin
+acceso a los repositorios de Google/Android), así que se optó a propósito
+por un binario **prebuilt**: `com.github.tdlibx:td:1.8.56`, publicado vía
+JitPack (repackaging del `tdlib/td` oficial). La contrapartida es depender
+de que ese repositorio de terceros se mantenga; si en algún momento deja de
+publicarse, el reemplazo es cambiar una sola dependencia en
+`app/build.gradle.kts` sin tocar `TdLibAuthClient.kt`.
+
+### Primer uso (API_ID / API_HASH)
+
+TDLib exige credenciales de **aplicación** (distintas de tu cuenta de
+Telegram): se crean gratis, una sola vez, en
+[my.telegram.org/apps](https://my.telegram.org/apps). La primera vez que
+abras la app te va a pedir el API ID y el API Hash — se guardan cifrados en
+el teléfono y no se vuelven a pedir.
 
 ## Nota sobre el CI
 

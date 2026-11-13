@@ -23,13 +23,15 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jox3.scanner.scan.EstadoFlujoEscaneo
 import com.jox3.scanner.scan.ScanFlowViewModel
-import com.jox3.scanner.telegram.FakeTelegramAuthClient
+import com.jox3.scanner.telegram.CredencialesApiTelegram
+import com.jox3.scanner.telegram.TdLibAuthClient
 import com.jox3.scanner.ui.chats.ChatsScreen
 import com.jox3.scanner.ui.login.LoginScreen
 import com.jox3.scanner.ui.login.LoginViewModel
 import com.jox3.scanner.ui.login.LoginViewModelFactory
 import com.jox3.scanner.ui.results.ResultsScreen
 import com.jox3.scanner.ui.scan.ScanProgressScreen
+import com.jox3.scanner.ui.setup.ApiCredentialsScreen
 import com.jox3.scanner.ui.theme.AcentoApp
 import com.jox3.scanner.ui.theme.ScannJox3Theme
 import com.jox3.scanner.update.InfoActualizacion
@@ -38,21 +40,31 @@ import com.jox3.scanner.update.UpdateViewModel
 
 class MainActivity : ComponentActivity() {
 
-    // TEMPORAL: se reemplaza por TdLibAuthClient cuando se integre TDLib.
-    private val authClient = FakeTelegramAuthClient()
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             ScannJox3Theme {
                 Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
-                    var autenticado by remember { mutableStateOf(false) }
+                    val credenciales = remember { CredencialesApiTelegram(applicationContext) }
+                    var credencialesListas by remember { mutableStateOf(credenciales.tieneCredenciales()) }
 
-                    if (!autenticado) {
-                        val viewModel = viewModel<LoginViewModel>(factory = LoginViewModelFactory(authClient))
-                        LoginScreen(viewModel = viewModel, onAutenticado = { autenticado = true })
+                    if (!credencialesListas) {
+                        ApiCredentialsScreen(
+                            onGuardar = { apiId, apiHash ->
+                                credenciales.guardar(apiId, apiHash)
+                                credencialesListas = true
+                            },
+                        )
                     } else {
-                        PantallaPrincipal()
+                        val authClient = remember { TdLibAuthClient(applicationContext, credenciales) }
+                        var autenticado by remember { mutableStateOf(false) }
+
+                        if (!autenticado) {
+                            val viewModel = viewModel<LoginViewModel>(factory = LoginViewModelFactory(authClient))
+                            LoginScreen(viewModel = viewModel, onAutenticado = { autenticado = true })
+                        } else {
+                            PantallaPrincipal()
+                        }
                     }
                 }
             }
