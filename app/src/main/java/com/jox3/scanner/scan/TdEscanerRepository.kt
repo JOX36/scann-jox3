@@ -338,8 +338,18 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
     }
 
     private companion object {
-        const val LIMITE_MENSAJES = 200
-        const val LOTE_POR_PAGINA = 50
+        // El script de Python lee hasta MESSAGE_SCAN_LIMIT = 10000 mensajes
+        // por chat (ver iptv_super_scanner_v4.py, scan_messages()). Acá
+        // estaba en 200 — en un chat con mucho historial (como el que
+        // reportó el usuario: 3 de 4 temas cortados justo en el tope,
+        // 646 mensajes leídos pero solo 2 enlaces candidatos cuando el
+        // chat tiene "cientos de listas activas") eso dejaba fuera casi
+        // todo el historial real. Se sube a 10000 para igualar al script.
+        const val LIMITE_MENSAJES = 10_000
+        // Tope real de TDLib por página (documentado: "no greater than
+        // 100"); subirlo de 50 a 100 reduce a la mitad la cantidad de
+        // ida-y-vueltas necesarias para llegar a [LIMITE_MENSAJES].
+        const val LOTE_POR_PAGINA = 100
         const val MAX_INTENTOS_VACIOS = 5
         const val LOTE_TEMAS = 100
         const val MAX_VALIDACIONES_EN_PARALELO = 50

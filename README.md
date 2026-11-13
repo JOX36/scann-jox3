@@ -407,6 +407,27 @@ mandar el texto completo tal cual, sin recortes.
       — mismo mecanismo que ya usaba "Guardar .txt" de los resultados
       (reutiliza el `FileProvider` existente).
 
+## Etapa 12: el límite de mensajes leídos por chat era 50 veces más chico que en Python
+
+El registro paso a paso (Etapa 11) permitió ver exactamente qué pasaba en
+un chat con "cientos de listas activas" que solo arrojaba 2 enlaces
+candidatos: 3 de sus 4 temas se cortaron justo en 200 mensajes leídos —
+el tope que tenía la app —, dejando fuera prácticamente todo el historial
+real del chat.
+
+- [x] El script de Python lee hasta `MESSAGE_SCAN_LIMIT = 10000` mensajes
+      por chat (`scan_messages()`); la app tenía ese tope en apenas 200.
+      Se sube a 10000 para igualar al script — un chat con mucho
+      historial (o con varios temas, cada uno con su propio tope) ya no
+      se corta cerca del principio.
+- [x] De paso, el tamaño de página por petición a TDLib sube de 50 a 100
+      (el máximo real que permite TDLib), para que llegar al nuevo tope
+      de 10000 necesite la mitad de ida-y-vueltas.
+- Como contraparte: un chat con mucho historial real y varios temas
+  puede tardar bastante más en leerse por completo (cientos de páginas
+  en vez de unas pocas) — es el mismo trade-off que ya asume el script
+  de Python con su propio límite de 10000.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
