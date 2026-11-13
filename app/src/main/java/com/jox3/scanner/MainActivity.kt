@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jox3.scanner.telegram.FakeTelegramAuthClient
@@ -24,7 +28,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             ScannJox3Theme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    var autenticado by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                    var autenticado by remember { mutableStateOf(false) }
 
                     if (!autenticado) {
                         val viewModel = viewModel(factory = LoginViewModelFactory(authClient))
