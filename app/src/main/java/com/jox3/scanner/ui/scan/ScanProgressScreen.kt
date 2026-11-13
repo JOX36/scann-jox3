@@ -1,11 +1,13 @@
 package com.jox3.scanner.ui.scan
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -43,6 +46,7 @@ fun ScanProgressScreen(
     encontradas: List<ListaValidada>,
     errores: List<String> = emptyList(),
     diagnostico: List<String> = emptyList(),
+    registro: List<String> = emptyList(),
     inicioMs: Long = System.currentTimeMillis(),
     onDetener: (() -> Unit)? = null,
 ) {
@@ -82,6 +86,11 @@ fun ScanProgressScreen(
         if (diagnostico.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             PanelDiagnostico(diagnostico)
+        }
+
+        if (registro.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            PanelRegistro(registro)
         }
 
         if (total > 0) {
@@ -179,6 +188,49 @@ internal fun PanelDiagnostico(diagnostico: List<String>) {
             Spacer(Modifier.height(4.dp))
             diagnostico.forEach { linea ->
                 Text("• $linea", color = TextoSecundario, fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+/**
+ * Registro paso a paso de todo el escaneo (ver
+ * [com.jox3.scanner.scan.EventoEscaneo.LogPaso]) — pedido explícito del
+ * usuario para ver de principio a fin qué hizo la app ("¿tiene temas?",
+ * "N mensajes leídos", "validando enlace X", "activa/inactiva", etc.) sin
+ * tener que interpretar solo los contadores. Se arranca colapsado porque
+ * puede tener muchas líneas; se expande tocando el encabezado.
+ */
+@Composable
+internal fun PanelRegistro(registro: List<String>) {
+    var expandido by remember { mutableStateOf(false) }
+
+    Surface(
+        color = SuperficieApp,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expandido = !expandido },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "${if (expandido) "▾" else "▸"} Ver registro detallado (${registro.size} paso(s))",
+                    color = TextoPrimario,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            if (expandido) {
+                Spacer(Modifier.height(6.dp))
+                LazyColumn(modifier = Modifier.heightIn(max = 260.dp)) {
+                    items(registro) { linea ->
+                        Text(linea, color = TextoSecundario, fontSize = 11.sp)
+                    }
+                }
             }
         }
     }

@@ -374,6 +374,25 @@ algo más estructural con ese chat específico.
       "¿tiene Temas?" se equivocó con ese chat puntual (no era realmente un
       foro), esto es lo que debía leerse desde un principio.
 
+## Etapa 11: registro paso a paso del escaneo (temporal, para diagnóstico)
+
+Pedido explícito del usuario: poder ver, de principio a fin, exactamente
+qué hizo la app durante un escaneo — no solo los contadores finales — sin
+tener que adivinar dónde se perdió algo.
+
+- [x] Nuevo panel colapsable **"Ver registro detallado"** (arranca
+      cerrado, toca el encabezado para abrirlo), disponible tanto en la
+      pantalla de escaneo como en Resultados. Muestra una línea por cada
+      paso real, en orden: `Escaneo iniciado: N chat(s)...` → por cada
+      chat, si tiene Temas o no, cuántos temas/mensajes trajo cada uno (o
+      si falló y cayó al historial normal), cuántos enlaces candidatos
+      salió de él → `Validando N enlaces...` → una línea por cada enlace
+      (✅ activa / ❌ inactiva / ⚠️ sin usuario-contraseña reconocible) →
+      `Escaneo terminado: X activas de N validadas.`
+- [x] Es un registro explícitamente temporal, pensado para diagnosticar
+      estos últimos problemas de lectura por Temas — no un reemplazo de
+      los paneles de errores/diagnóstico por chat, que siguen igual.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

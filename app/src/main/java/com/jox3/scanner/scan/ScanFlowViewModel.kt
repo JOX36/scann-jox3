@@ -54,12 +54,17 @@ sealed class EstadoFlujoEscaneo {
         // Diagnóstico por chat (mensajes leídos / enlaces candidatos) —
         // ver [EventoEscaneo.InfoChat]. No son errores, se muestran siempre.
         val diagnostico: List<String> = emptyList(),
+        // Registro paso a paso de todo el escaneo (ver [EventoEscaneo.LogPaso])
+        // — temporal, pedido explícito del usuario para ver de principio a
+        // fin qué hizo la app, sin tener que interpretar solo contadores.
+        val registro: List<String> = emptyList(),
     ) : EstadoFlujoEscaneo()
 
     data class Resultados(
         val listas: List<ListaValidada>,
         val errores: List<String> = emptyList(),
         val diagnostico: List<String> = emptyList(),
+        val registro: List<String> = emptyList(),
     ) : EstadoFlujoEscaneo()
 }
 
@@ -81,6 +86,7 @@ class ScanFlowViewModel(
     private var encontradasActuales: List<ListaValidada> = emptyList()
     private var erroresActuales: List<String> = emptyList()
     private var diagnosticoActual: List<String> = emptyList()
+    private var registroActual: List<String> = emptyList()
 
     init {
         cargarChats()
@@ -161,13 +167,15 @@ class ScanFlowViewModel(
         encontradasActuales = emptyList()
         erroresActuales = emptyList()
         diagnosticoActual = emptyList()
+        registroActual = emptyList()
         _estado.value = EstadoFlujoEscaneo.Escaneando(0, 0, emptyList())
         scanJob = viewModelScope.launch {
             val encontradas = mutableListOf<ListaValidada>()
             val errores = mutableListOf<String>()
             val diagnostico = mutableListOf<String>()
+            val registro = mutableListOf<String>()
             escanearTextoLocal(nombreArchivo, contenido).collect { evento ->
-                procesarEvento(evento, encontradas, errores, diagnostico)
+                procesarEvento(evento, encontradas, errores, diagnostico, registro)
             }
         }
     }
@@ -176,13 +184,15 @@ class ScanFlowViewModel(
         encontradasActuales = emptyList()
         erroresActuales = emptyList()
         diagnosticoActual = emptyList()
+        registroActual = emptyList()
         _estado.value = EstadoFlujoEscaneo.Escaneando(0, 0, emptyList())
         scanJob = viewModelScope.launch {
             val encontradas = mutableListOf<ListaValidada>()
             val errores = mutableListOf<String>()
             val diagnostico = mutableListOf<String>()
+            val registro = mutableListOf<String>()
             escanerRepository.escanear(chats, filtroHost, soloLatino).collect { evento ->
-                procesarEvento(evento, encontradas, errores, diagnostico)
+                procesarEvento(evento, encontradas, errores, diagnostico, registro)
             }
         }
     }
@@ -196,7 +206,7 @@ class ScanFlowViewModel(
     fun detenerYVerParciales() {
         scanJob?.cancel()
         scanJob = null
-        _estado.value = EstadoFlujoEscaneo.Resultados(encontradasActuales, erroresActuales, diagnosticoActual)
+        _estado.value = EstadoFlujoEscaneo.Resultados(encontradasActuales, erroresActuales, diagnosticoActual, registroActual)
     }
 
     private fun procesarEvento(
@@ -204,6 +214,7 @@ class ScanFlowViewModel(
         encontradas: MutableList<ListaValidada>,
         errores: MutableList<String>,
         diagnostico: MutableList<String>,
+        registro: MutableList<String>,
     ) {
         when (evento) {
             is EventoEscaneo.Progreso -> {
@@ -217,6 +228,7 @@ class ScanFlowViewModel(
                     errores.toList(),
                     inicioMs,
                     diagnostico.toList(),
+                    registro.toList(),
                 )
             }
             is EventoEscaneo.ListaEncontrada -> {
@@ -244,9 +256,22 @@ class ScanFlowViewModel(
                     _estado.value = estadoActual.copy(diagnostico = diagnostico.toList())
                 }
             }
+            is EventoEscaneo.LogPaso -> {
+                registro += evento.mensaje
+                registroActual = registro.toList()
+                val estadoActual = _estado.value
+                if (estadoActual is EstadoFlujoEscaneo.Escaneando) {
+                    _estado.value = estadoActual.copy(registro = registro.toList())
+                }
+            }
             EventoEscaneo.Finalizado -> {
                 scanJob = null
-                _estado.value = EstadoFlujoEscaneo.Resultados(encontradas.toList(), errores.toList(), diagnostico.toList())
+                _estado.value = EstadoFlujoEscaneo.Resultados(
+                    encontradas.toList(),
+                    errores.toList(),
+                    diagnostico.toList(),
+                    registro.toList(),
+                )
             }
         }
     }

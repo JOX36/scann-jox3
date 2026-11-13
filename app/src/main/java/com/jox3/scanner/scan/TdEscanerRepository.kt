@@ -30,21 +30,32 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         filtroHost: String?,
         soloLatino: Boolean,
     ): Flow<EventoEscaneo> = channelFlow {
+        // Registro temporal de diagnóstico: una línea por cada paso real
+        // que da el escaneo, en orden — pedido explícito del usuario para
+        // poder ver "qué hizo la app" de principio a fin sin tener que
+        // interpretar solo contadores. Se manda como evento normal
+        // ([EventoEscaneo.LogPaso]), nada especial del lado de TDLib.
+        val registrar: suspend (String) -> Unit = { mensaje -> send(EventoEscaneo.LogPaso(mensaje)) }
+
         send(EventoEscaneo.Progreso(0, 0))
+        registrar("Escaneo iniciado: ${chats.size} chat(s) seleccionado(s).")
 
         // Primero se junta el texto de todos los mensajes de los chats
         // elegidos y se extraen los enlaces candidatos — igual que el
         // script de Python lee los mensajes antes de validar cada enlace.
         val enlacesPorOrigen = mutableListOf<Pair<String, String>>()
         for (chat in chats) {
+            registrar("📂 Leyendo \"${chat.titulo}\"...")
             val mensajes = try {
-                obtenerMensajesRecientes(chat.id)
+                obtenerMensajesRecientes(chat.id, chat.titulo, registrar)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 // Antes este error se tragaba en silencio y el chat
                 // simplemente "no encontraba nada" sin avisar por qué.
-                send(EventoEscaneo.ErrorEnChat(chat.titulo, e.message ?: "error desconocido de TDLib"))
+                val detalle = e.message ?: "error desconocido de TDLib"
+                registrar("❌ \"${chat.titulo}\": $detalle")
+                send(EventoEscaneo.ErrorEnChat(chat.titulo, detalle))
                 null
             }
 
@@ -64,15 +75,19 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
                         candidatosDeEsteChat++
                     }
                 }
+                registrar("✅ \"${chat.titulo}\": ${mensajes.size} mensaje(s) leído(s), $candidatosDeEsteChat enlace(s) candidato(s).")
                 send(EventoEscaneo.InfoChat(chat.titulo, mensajes.size, candidatosDeEsteChat))
             }
         }
 
         var enlacesUnicos = enlacesPorOrigen.distinctBy { it.second }
         if (!filtroHost.isNullOrBlank()) {
+            val totalAntesDelFiltro = enlacesUnicos.size
             enlacesUnicos = enlacesUnicos.filter { (_, enlace) -> enlace.contains(filtroHost, ignoreCase = true) }
+            registrar("🔧 Filtro de host \"$filtroHost\": $totalAntesDelFiltro → ${enlacesUnicos.size} enlace(s).")
         }
         send(EventoEscaneo.Progreso(0, enlacesUnicos.size))
+        registrar("🔎 Validando ${enlacesUnicos.size} enlace(s) candidato(s) (hasta $MAX_VALIDACIONES_EN_PARALELO en paralelo)...")
 
         // Validar uno por uno (como antes) hacía que UN solo panel colgado
         // detuviera el escaneo completo en "0 de N validados" para
@@ -84,14 +99,22 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         // (`MAX_CONCURRENT_VALIDATIONS`); acá es el equivalente con un
         // `Semaphore` para no abrir cientos de conexiones de golpe.
         val procesados = AtomicInteger(0)
+        val activas = AtomicInteger(0)
         val semaforo = Semaphore(MAX_VALIDACIONES_EN_PARALELO)
         coroutineScope {
             enlacesUnicos.map { (origen, enlace) ->
                 async {
                     semaforo.withPermit {
                         val credenciales = extraerCredencialesXtream(enlace)
-                        if (credenciales != null) {
+                        if (credenciales == null) {
+                            registrar("⚠️ Enlace sin usuario/contraseña reconocible (desde \"$origen\"): $enlace")
+                        } else {
                             val validada = validarYEnriquecer(credenciales, origen)
+                            if (validada.activa) activas.incrementAndGet()
+                            registrar(
+                                if (validada.activa) "✅ Activa: ${validada.credenciales.host} (desde \"$origen\")"
+                                else "❌ Inactiva/caída: ${validada.credenciales.host} (desde \"$origen\")"
+                            )
                             // El modo "LATINO" del script de Python solo se
                             // queda con listas activas y de contenido
                             // latino tras validarlas.
@@ -104,6 +127,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
                 }
             }.awaitAll()
         }
+        registrar("🏁 Escaneo terminado: ${activas.get()} activa(s) de ${enlacesUnicos.size} validada(s).")
         send(EventoEscaneo.Finalizado)
     }
 
@@ -130,8 +154,16 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
      * que un chat con "listas por secciones" diera "0 de 0" aunque otros
      * chats normales ya funcionaran bien.
      */
-    private suspend fun obtenerMensajesRecientes(chatId: Long, limite: Int = LIMITE_MENSAJES): List<TdApi.Message> {
-        if (esChatConTemas(chatId)) {
+    private suspend fun obtenerMensajesRecientes(
+        chatId: Long,
+        chatTitulo: String,
+        registrar: suspend (String) -> Unit,
+        limite: Int = LIMITE_MENSAJES,
+    ): List<TdApi.Message> {
+        val esForo = esChatConTemas(chatId)
+        registrar("   ¿tiene Temas? ${if (esForo) "sí" else "no"}")
+
+        if (esForo) {
             // Si la lectura por temas no trae NADA — ya sea porque
             // GetForumTopics/GetForumTopicHistory no respondieron a tiempo
             // (visto en la práctica incluso con GetForumTopics, la llamada
@@ -142,14 +174,20 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
             // [esChatConTemas] se equivocó con este chat puntual (no es
             // realmente un foro), esto es lo que debía leerse desde el
             // principio.
-            val mensajesDeForo = try {
-                obtenerMensajesDeForo(chatId, limite)
+            var mensajesDeForo: List<TdApi.Message> = emptyList()
+            try {
+                mensajesDeForo = obtenerMensajesDeForo(chatId, limite, registrar)
+                if (mensajesDeForo.isEmpty()) {
+                    registrar("   lectura por Temas no trajo mensajes → probando historial normal...")
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                emptyList()
+                registrar("   lectura por Temas falló (${e.message ?: "error desconocido"}) → probando historial normal...")
             }
             if (mensajesDeForo.isNotEmpty()) return mensajesDeForo
+        } else {
+            registrar("   leyendo historial normal...")
         }
         return obtenerMensajesDeHistorialNormal(chatId, limite)
     }
@@ -209,17 +247,30 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
      * Ahora cada tema se intenta por separado: uno que falle no tira el
      * resto a la basura.
      */
-    private suspend fun obtenerMensajesDeForo(chatId: Long, limitePorTema: Int): List<TdApi.Message> {
+    private suspend fun obtenerMensajesDeForo(
+        chatId: Long,
+        limitePorTema: Int,
+        registrar: suspend (String) -> Unit,
+    ): List<TdApi.Message> {
+        // Si esta llamada falla, se deja propagar sin atrapar — quien llama
+        // ([obtenerMensajesRecientes]) ya sabe convertirlo en el mensaje de
+        // "lectura por Temas falló" y caer al historial normal.
+        val ids = obtenerIdsDeTemas(chatId)
+        registrar("   ${ids.size} tema(s) encontrado(s)")
+
         val mensajes = mutableListOf<TdApi.Message>()
-        for (temaId in obtenerIdsDeTemas(chatId)) {
+        for (temaId in ids) {
             try {
-                mensajes += obtenerMensajesDeTema(chatId, temaId, limitePorTema)
+                val mensajesDelTema = obtenerMensajesDeTema(chatId, temaId, limitePorTema)
+                registrar("   tema $temaId: ${mensajesDelTema.size} mensaje(s)")
+                mensajes += mensajesDelTema
             } catch (e: CancellationException) {
                 throw e // un cancelado real (ej. "Detener y ver parciales") sí debe propagarse
             } catch (e: Exception) {
                 // Se sigue con el resto de temas; si todos fallan, el chat
                 // queda igual que antes (0 mensajes), pero si solo uno
                 // falla ya no se pierde lo que los demás sí trajeron.
+                registrar("   tema $temaId: falló (${e.message ?: "error desconocido"})")
             }
         }
         return mensajes

@@ -25,6 +25,15 @@ sealed class EventoEscaneo {
      * Activas/Validadas).
      */
     data class InfoChat(val chatTitulo: String, val mensajesLeidos: Int, val enlacesCandidatos: Int) : EventoEscaneo()
+    /**
+     * Un paso puntual del escaneo, en orden cronológico — "¿este chat tiene
+     * Temas?", "N temas encontrados", "validando enlace X", "activa/
+     * inactiva", etc. Pensado como registro temporal de diagnóstico: un
+     * resumen explícito de todo lo que hizo la app desde que arrancó el
+     * escaneo hasta el resultado final, sin tener que adivinar a partir de
+     * los contadores.
+     */
+    data class LogPaso(val mensaje: String) : EventoEscaneo()
     object Finalizado : EventoEscaneo()
 }
 

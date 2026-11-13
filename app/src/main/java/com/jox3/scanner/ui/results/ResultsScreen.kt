@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.jox3.scanner.scan.engine.ListaValidada
 import com.jox3.scanner.ui.scan.PanelDiagnostico
 import com.jox3.scanner.ui.scan.PanelErrores
+import com.jox3.scanner.ui.scan.PanelRegistro
 import com.jox3.scanner.ui.theme.AcentoApp
 import com.jox3.scanner.ui.theme.AmarilloApp
 import com.jox3.scanner.ui.theme.ErrorApp
@@ -51,6 +52,7 @@ fun ResultsScreen(
     onEscanearDeNuevo: () -> Unit,
     errores: List<String> = emptyList(),
     diagnostico: List<String> = emptyList(),
+    registro: List<String> = emptyList(),
     onGuardarTxt: (() -> Unit)? = null,
     onEnviarTelegram: (() -> Unit)? = null,
 ) {
@@ -83,6 +85,11 @@ fun ResultsScreen(
         if (diagnostico.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             PanelDiagnostico(diagnostico)
+        }
+
+        if (registro.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            PanelRegistro(registro)
         }
 
         Spacer(Modifier.height(12.dp))

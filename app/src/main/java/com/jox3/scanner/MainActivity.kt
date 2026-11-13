@@ -193,6 +193,7 @@ private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlo
                 listas = estado.listas,
                 errores = estado.errores,
                 diagnostico = estado.diagnostico,
+                registro = estado.registro,
                 onEscanearDeNuevo = viewModel::reiniciar,
             )
         }
@@ -203,6 +204,7 @@ private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlo
                 encontradas = estado.encontradas,
                 errores = estado.errores,
                 diagnostico = estado.diagnostico,
+                registro = estado.registro,
                 inicioMs = estado.inicioMs,
                 onDetener = viewModel::detenerYVerParciales,
             )
@@ -291,6 +293,7 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                 encontradas = s.encontradas,
                 errores = s.errores,
                 diagnostico = s.diagnostico,
+                registro = s.registro,
                 inicioMs = s.inicioMs,
                 onDetener = viewModel::detenerYVerParciales,
             )
@@ -301,6 +304,7 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                 listas = s.listas,
                 errores = s.errores,
                 diagnostico = s.diagnostico,
+                registro = s.registro,
                 onEscanearDeNuevo = viewModel::reiniciar,
             )
         }
@@ -319,6 +323,7 @@ private fun ResultsScreenConectada(
     listas: List<ListaValidada>,
     errores: List<String>,
     diagnostico: List<String> = emptyList(),
+    registro: List<String> = emptyList(),
     onEscanearDeNuevo: () -> Unit,
 ) {
     val contexto = LocalContext.current
@@ -329,6 +334,7 @@ private fun ResultsScreenConectada(
         listas = listas,
         errores = errores,
         diagnostico = diagnostico,
+        registro = registro,
         onEscanearDeNuevo = onEscanearDeNuevo,
         onGuardarTxt = {
             val archivo = ResultadosExportador.guardarArchivo(contexto, listas)
