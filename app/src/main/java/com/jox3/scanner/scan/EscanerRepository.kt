@@ -23,7 +23,18 @@ sealed class EventoEscaneo {
  * [validarYEnriquecer]) ya es el motor real, reutilizable sin cambios.
  */
 interface EscanerRepository {
-    fun escanear(chats: List<ChatTelegram>): Flow<EventoEscaneo>
+    /**
+     * @param filtroHost si no es nulo/blanco, solo se consideran enlaces cuyo
+     *   texto contenga este host (equivalente a los modos "buscar un host..."
+     *   del script de Python).
+     * @param soloLatino si es `true`, solo se emiten listas activas y con
+     *   contenido latino (equivalente al modo "LATINO" del script de Python).
+     */
+    fun escanear(
+        chats: List<ChatTelegram>,
+        filtroHost: String? = null,
+        soloLatino: Boolean = false,
+    ): Flow<EventoEscaneo>
 }
 
 /**
@@ -42,7 +53,11 @@ class FakeEscanerRepository : EscanerRepository {
             "http://ejemplo-servidor-demo.invalid:8080/get.php?username=demo123&password=demo123&type=m3u_plus",
     )
 
-    override fun escanear(chats: List<ChatTelegram>): Flow<EventoEscaneo> = flow {
+    override fun escanear(
+        chats: List<ChatTelegram>,
+        filtroHost: String?,
+        soloLatino: Boolean,
+    ): Flow<EventoEscaneo> = flow {
         val enlaces = mensajesSimulados.flatMap { extraerEnlaces(it) }.distinct()
         val origen = chats.firstOrNull()?.titulo ?: "chat desconocido"
 

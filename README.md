@@ -88,6 +88,29 @@ Telegram): se crean gratis, una sola vez, en
 abras la app te va a pedir el API ID y el API Hash — se guardan cifrados en
 el teléfono y no se vuelven a pedir.
 
+## Estado actual (Etapa 6)
+
+- [x] **Menú de modos de escaneo**, igual que el menú del script de Python
+      original (que tenía 5 opciones antes de escanear). Antes la app iba
+      directo de "elegir chats" a "escanear todo"; ahora primero se elige el
+      modo:
+      1. **Cualquier lista**: el flujo de siempre (elegir uno o varios chats
+         y escanear todo lo que haya).
+      2. **Buscar un host en todos los chats**: escribe un host/dominio y lo
+         busca en todos tus chats, sin elegir uno a uno.
+      3. **Buscar un host en un chat específico**: escribe un host y elige un
+         único chat.
+      4. **Solo contenido LATINO en un chat**: elige un único chat y se queda
+         solo con las listas activas y de contenido latino.
+      5. **Escanear un archivo .txt del dispositivo**: abre el selector de
+         archivos del sistema, lee el .txt elegido y se queda solo con las
+         listas latinas que encuentre — equivalente al modo "archivo local"
+         del script (que en la versión de escritorio leía una carpeta fija
+         de Termux; aquí se eligen con el selector nativo de Android).
+- [x] `EscanerRepository.escanear(...)` ahora acepta un filtro de host
+      opcional y un flag "solo latino", reutilizados por los 3 primeros
+      modos sin duplicar el motor de validación.
+
 ## Firma estable y actualizaciones automáticas reales
 
 Hasta ahora cada build de CI quedaba firmado con una keystore de debug

@@ -1,6 +1,9 @@
 package com.jox3.scanner
 
+import android.content.Context
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -20,19 +23,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jox3.scanner.scan.EstadoFlujoEscaneo
 import com.jox3.scanner.scan.ScanFlowViewModel
 import com.jox3.scanner.scan.ScanFlowViewModelFactory
 import com.jox3.scanner.scan.TdChatsRepository
 import com.jox3.scanner.scan.TdEscanerRepository
+import com.jox3.scanner.scan.TipoModo
 import com.jox3.scanner.telegram.CredencialesApiTelegram
 import com.jox3.scanner.telegram.TdLibAuthClient
 import com.jox3.scanner.ui.chats.ChatsScreen
+import com.jox3.scanner.ui.chats.SeleccionarChatScreen
 import com.jox3.scanner.ui.login.LoginScreen
 import com.jox3.scanner.ui.login.LoginViewModel
 import com.jox3.scanner.ui.login.LoginViewModelFactory
 import com.jox3.scanner.ui.results.ResultsScreen
+import com.jox3.scanner.ui.scan.HostInputScreen
+import com.jox3.scanner.ui.scan.ModoEscaneoScreen
 import com.jox3.scanner.ui.scan.ScanProgressScreen
 import com.jox3.scanner.ui.setup.ApiCredentialsScreen
 import com.jox3.scanner.ui.theme.AcentoApp
@@ -60,7 +68,7 @@ class MainActivity : ComponentActivity() {
                             },
                         )
                     } else {
-                        val authClient = remember { TdLibAuthClient(applicationContext, credenciales) }
+                        val authClient = remember { TdLibAuthClient.obtenerInstancia(applicationContext, credenciales) }
                         var autenticado by remember { mutableStateOf(false) }
 
                         if (!autenticado) {
@@ -116,6 +124,28 @@ private fun PantallaEscaneo(authClient: TdLibAuthClient) {
         factory = ScanFlowViewModelFactory(chatsRepository, escanerRepository),
     )
     val estado by viewModel.estado.collectAsState()
+    val contexto = LocalContext.current
+
+    // Modo "Escanear un archivo .txt del dispositivo": abre el selector de
+    // archivos del sistema (Storage Access Framework) y, si el usuario
+    // elige uno, lee su contenido y arranca el escaneo con él.
+    val selectorArchivo = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) {
+            viewModel.volverAElegirModo()
+            return@rememberLauncherForActivityResult
+        }
+        val nombre = nombreDeArchivo(contexto, uri) ?: "archivo.txt"
+        val contenido = contexto.contentResolver.openInputStream(uri)
+            ?.bufferedReader()
+            ?.use { it.readText() }
+        if (contenido != null) {
+            viewModel.escanearArchivoLocal(nombre, contenido)
+        } else {
+            viewModel.volverAElegirModo()
+        }
+    }
 
     when (val s = estado) {
         EstadoFlujoEscaneo.CargandoChats -> {
@@ -128,12 +158,32 @@ private fun PantallaEscaneo(authClient: TdLibAuthClient) {
             }
         }
 
+        is EstadoFlujoEscaneo.EligiendoModo -> {
+            ModoEscaneoScreen(
+                onModoElegido = { modo ->
+                    if (modo == TipoModo.ARCHIVO_LOCAL) {
+                        selectorArchivo.launch(arrayOf("text/plain"))
+                    } else {
+                        viewModel.elegirModo(modo)
+                    }
+                },
+            )
+        }
+
+        is EstadoFlujoEscaneo.EscribiendoHost -> {
+            HostInputScreen(onHostConfirmado = viewModel::hostConfirmado)
+        }
+
+        is EstadoFlujoEscaneo.EligiendoChatUnico -> {
+            SeleccionarChatScreen(chats = s.chats, onChatElegido = viewModel::chatUnicoElegido)
+        }
+
         is EstadoFlujoEscaneo.SeleccionandoChats -> {
             ChatsScreen(
                 chats = s.chats,
                 seleccionados = s.seleccionados,
                 onAlternarSeleccion = viewModel::alternarSeleccion,
-                onEscanear = viewModel::iniciarEscaneo,
+                onEscanear = viewModel::iniciarEscaneoDeSeleccionados,
             )
         }
 
@@ -144,5 +194,14 @@ private fun PantallaEscaneo(authClient: TdLibAuthClient) {
         is EstadoFlujoEscaneo.Resultados -> {
             ResultsScreen(listas = s.listas, onEscanearDeNuevo = viewModel::reiniciar)
         }
+    }
+}
+
+/** Nombre a mostrar del archivo elegido en el selector del sistema (si no se puede leer, cae a null). */
+private fun nombreDeArchivo(contexto: Context, uri: Uri): String? {
+    return contexto.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+        if (!cursor.moveToFirst()) return@use null
+        val indice = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (indice >= 0) cursor.getString(indice) else null
     }
 }

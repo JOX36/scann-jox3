@@ -18,7 +18,11 @@ import org.drinkless.tdlib.TdApi
  */
 class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerRepository {
 
-    override fun escanear(chats: List<ChatTelegram>): Flow<EventoEscaneo> = flow {
+    override fun escanear(
+        chats: List<ChatTelegram>,
+        filtroHost: String?,
+        soloLatino: Boolean,
+    ): Flow<EventoEscaneo> = flow {
         emit(EventoEscaneo.Progreso(0, 0))
 
         // Primero se junta el texto de todos los mensajes de los chats
@@ -33,14 +37,21 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
             }
         }
 
-        val enlacesUnicos = enlacesPorOrigen.distinctBy { it.second }
+        var enlacesUnicos = enlacesPorOrigen.distinctBy { it.second }
+        if (!filtroHost.isNullOrBlank()) {
+            enlacesUnicos = enlacesUnicos.filter { (_, enlace) -> enlace.contains(filtroHost, ignoreCase = true) }
+        }
         emit(EventoEscaneo.Progreso(0, enlacesUnicos.size))
 
         enlacesUnicos.forEachIndexed { indice, (origen, enlace) ->
             val credenciales = extraerCredencialesXtream(enlace)
             if (credenciales != null) {
                 val validada = validarYEnriquecer(credenciales, origen)
-                emit(EventoEscaneo.ListaEncontrada(validada))
+                // El modo "LATINO" del script de Python solo se queda con
+                // listas activas y de contenido latino tras validarlas.
+                if (!soloLatino || (validada.activa && validada.esLatino)) {
+                    emit(EventoEscaneo.ListaEncontrada(validada))
+                }
             }
             emit(EventoEscaneo.Progreso(indice + 1, enlacesUnicos.size))
         }
