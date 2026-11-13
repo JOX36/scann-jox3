@@ -5,9 +5,15 @@ import com.jox3.scanner.scan.data.extraerCredencialesXtream
 import com.jox3.scanner.scan.data.extraerEnlaces
 import com.jox3.scanner.scan.engine.validarYEnriquecer
 import com.jox3.scanner.telegram.TdLibAuthClient
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import org.drinkless.tdlib.TdApi
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Lee el historial reciente de los chats seleccionados buscando enlaces de
@@ -22,8 +28,8 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         chats: List<ChatTelegram>,
         filtroHost: String?,
         soloLatino: Boolean,
-    ): Flow<EventoEscaneo> = flow {
-        emit(EventoEscaneo.Progreso(0, 0))
+    ): Flow<EventoEscaneo> = channelFlow {
+        send(EventoEscaneo.Progreso(0, 0))
 
         // Primero se junta el texto de todos los mensajes de los chats
         // elegidos y se extraen los enlaces candidatos — igual que el
@@ -35,7 +41,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
             } catch (e: Exception) {
                 // Antes este error se tragaba en silencio y el chat
                 // simplemente "no encontraba nada" sin avisar por qué.
-                emit(EventoEscaneo.ErrorEnChat(chat.titulo, e.message ?: "error desconocido de TDLib"))
+                send(EventoEscaneo.ErrorEnChat(chat.titulo, e.message ?: "error desconocido de TDLib"))
                 emptyList()
             }
             for (mensaje in mensajes) {
@@ -49,21 +55,39 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         if (!filtroHost.isNullOrBlank()) {
             enlacesUnicos = enlacesUnicos.filter { (_, enlace) -> enlace.contains(filtroHost, ignoreCase = true) }
         }
-        emit(EventoEscaneo.Progreso(0, enlacesUnicos.size))
+        send(EventoEscaneo.Progreso(0, enlacesUnicos.size))
 
-        enlacesUnicos.forEachIndexed { indice, (origen, enlace) ->
-            val credenciales = extraerCredencialesXtream(enlace)
-            if (credenciales != null) {
-                val validada = validarYEnriquecer(credenciales, origen)
-                // El modo "LATINO" del script de Python solo se queda con
-                // listas activas y de contenido latino tras validarlas.
-                if (!soloLatino || (validada.activa && validada.esLatino)) {
-                    emit(EventoEscaneo.ListaEncontrada(validada))
+        // Validar uno por uno (como antes) hacía que UN solo panel colgado
+        // detuviera el escaneo completo en "0 de N validados" para
+        // siempre — ahora, ya con timeout en [NetworkModule], tampoco
+        // convenía quedarse secuencial: con decenas/cientos de enlaces
+        // reales, 10s de timeout por enlace uno tras otro igual tarda
+        // minutos. El script de Python ya validaba hasta
+        // [MAX_VALIDACIONES_EN_PARALELO] enlaces a la vez
+        // (`MAX_CONCURRENT_VALIDATIONS`); acá es el equivalente con un
+        // `Semaphore` para no abrir cientos de conexiones de golpe.
+        val procesados = AtomicInteger(0)
+        val semaforo = Semaphore(MAX_VALIDACIONES_EN_PARALELO)
+        coroutineScope {
+            enlacesUnicos.map { (origen, enlace) ->
+                async {
+                    semaforo.withPermit {
+                        val credenciales = extraerCredencialesXtream(enlace)
+                        if (credenciales != null) {
+                            val validada = validarYEnriquecer(credenciales, origen)
+                            // El modo "LATINO" del script de Python solo se
+                            // queda con listas activas y de contenido
+                            // latino tras validarlas.
+                            if (!soloLatino || (validada.activa && validada.esLatino)) {
+                                send(EventoEscaneo.ListaEncontrada(validada))
+                            }
+                        }
+                        send(EventoEscaneo.Progreso(procesados.incrementAndGet(), enlacesUnicos.size))
+                    }
                 }
-            }
-            emit(EventoEscaneo.Progreso(indice + 1, enlacesUnicos.size))
+            }.awaitAll()
         }
-        emit(EventoEscaneo.Finalizado)
+        send(EventoEscaneo.Finalizado)
     }
 
     /**
@@ -215,5 +239,6 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         const val LOTE_POR_PAGINA = 50
         const val MAX_INTENTOS_VACIOS = 5
         const val LOTE_TEMAS = 100
+        const val MAX_VALIDACIONES_EN_PARALELO = 50
     }
 }
