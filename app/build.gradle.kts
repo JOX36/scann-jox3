@@ -54,6 +54,12 @@ dependencies {
     // equivalente al .env del script de Python pero cifrado en el dispositivo.
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
+    // TDLib (librería oficial de Telegram para cuentas de usuario), como
+    // binario prebuilt vía JitPack — decisión explícita para no compilar
+    // TDLib desde cero (CMake + NDK) en este entorno. Repackaging del
+    // tdlib/td oficial, versión 1.8.56.
+    implementation("com.github.tdlibx:td:1.8.56")
+
     // Red para las llamadas Xtream (player_api.php) — se usará en la
     // siguiente etapa (validación de listas), ya queda lista aquí.
     implementation("io.ktor:ktor-client-android:2.3.12")

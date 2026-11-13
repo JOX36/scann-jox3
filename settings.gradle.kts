@@ -11,6 +11,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // TDLib prebuilt para Android (com.github.tdlibx:td) se publica vía JitPack.
+        maven { url = uri("https://jitpack.io") }
     }
 }
 
