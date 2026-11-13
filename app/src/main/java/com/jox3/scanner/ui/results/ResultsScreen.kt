@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jox3.scanner.scan.engine.ListaValidada
+import com.jox3.scanner.ui.scan.PanelDiagnostico
 import com.jox3.scanner.ui.scan.PanelErrores
 import com.jox3.scanner.ui.theme.AcentoApp
 import com.jox3.scanner.ui.theme.AmarilloApp
@@ -49,6 +50,7 @@ fun ResultsScreen(
     listas: List<ListaValidada>,
     onEscanearDeNuevo: () -> Unit,
     errores: List<String> = emptyList(),
+    diagnostico: List<String> = emptyList(),
     onGuardarTxt: (() -> Unit)? = null,
     onEnviarTelegram: (() -> Unit)? = null,
 ) {
@@ -76,6 +78,11 @@ fun ResultsScreen(
         if (errores.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             PanelErrores(errores)
+        }
+
+        if (diagnostico.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            PanelDiagnostico(diagnostico)
         }
 
         Spacer(Modifier.height(12.dp))

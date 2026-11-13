@@ -15,6 +15,16 @@ sealed class EventoEscaneo {
     data class ListaEncontrada(val lista: ListaValidada) : EventoEscaneo()
     /** Un chat no se pudo leer (error real de TDLib) — no detiene el escaneo de los demás. */
     data class ErrorEnChat(val chatTitulo: String, val mensaje: String) : EventoEscaneo()
+    /**
+     * Diagnóstico de un chat ya leído con éxito (sin error): cuántos mensajes
+     * se leyeron y cuántos enlaces candidatos (antes de validar) se
+     * encontraron en ellos. No es un error — se muestra siempre, para poder
+     * distinguir de un vistazo "no leyó mensajes" de "leyó mensajes pero
+     * ninguno tenía un enlace" de "encontró enlaces pero ninguno quedó
+     * activo al validar" (esto último ya lo muestran los contadores de
+     * Activas/Validadas).
+     */
+    data class InfoChat(val chatTitulo: String, val mensajesLeidos: Int, val enlacesCandidatos: Int) : EventoEscaneo()
     object Finalizado : EventoEscaneo()
 }
 

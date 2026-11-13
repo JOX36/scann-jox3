@@ -51,11 +51,15 @@ sealed class EstadoFlujoEscaneo {
         // .copy() salvo que se pase explícito) — con esto la UI calcula
         // "validaciones/seg" sin que el repositorio tenga que reportarlo.
         val inicioMs: Long = System.currentTimeMillis(),
+        // Diagnóstico por chat (mensajes leídos / enlaces candidatos) —
+        // ver [EventoEscaneo.InfoChat]. No son errores, se muestran siempre.
+        val diagnostico: List<String> = emptyList(),
     ) : EstadoFlujoEscaneo()
 
     data class Resultados(
         val listas: List<ListaValidada>,
         val errores: List<String> = emptyList(),
+        val diagnostico: List<String> = emptyList(),
     ) : EstadoFlujoEscaneo()
 }
 
@@ -76,6 +80,7 @@ class ScanFlowViewModel(
     private var scanJob: Job? = null
     private var encontradasActuales: List<ListaValidada> = emptyList()
     private var erroresActuales: List<String> = emptyList()
+    private var diagnosticoActual: List<String> = emptyList()
 
     init {
         cargarChats()
@@ -155,12 +160,14 @@ class ScanFlowViewModel(
     fun escanearArchivoLocal(nombreArchivo: String, contenido: String) {
         encontradasActuales = emptyList()
         erroresActuales = emptyList()
+        diagnosticoActual = emptyList()
         _estado.value = EstadoFlujoEscaneo.Escaneando(0, 0, emptyList())
         scanJob = viewModelScope.launch {
             val encontradas = mutableListOf<ListaValidada>()
             val errores = mutableListOf<String>()
+            val diagnostico = mutableListOf<String>()
             escanearTextoLocal(nombreArchivo, contenido).collect { evento ->
-                procesarEvento(evento, encontradas, errores)
+                procesarEvento(evento, encontradas, errores, diagnostico)
             }
         }
     }
@@ -168,12 +175,14 @@ class ScanFlowViewModel(
     private fun iniciarEscaneo(chats: List<ChatTelegram>, filtroHost: String?, soloLatino: Boolean) {
         encontradasActuales = emptyList()
         erroresActuales = emptyList()
+        diagnosticoActual = emptyList()
         _estado.value = EstadoFlujoEscaneo.Escaneando(0, 0, emptyList())
         scanJob = viewModelScope.launch {
             val encontradas = mutableListOf<ListaValidada>()
             val errores = mutableListOf<String>()
+            val diagnostico = mutableListOf<String>()
             escanerRepository.escanear(chats, filtroHost, soloLatino).collect { evento ->
-                procesarEvento(evento, encontradas, errores)
+                procesarEvento(evento, encontradas, errores, diagnostico)
             }
         }
     }
@@ -187,13 +196,14 @@ class ScanFlowViewModel(
     fun detenerYVerParciales() {
         scanJob?.cancel()
         scanJob = null
-        _estado.value = EstadoFlujoEscaneo.Resultados(encontradasActuales, erroresActuales)
+        _estado.value = EstadoFlujoEscaneo.Resultados(encontradasActuales, erroresActuales, diagnosticoActual)
     }
 
     private fun procesarEvento(
         evento: EventoEscaneo,
         encontradas: MutableList<ListaValidada>,
         errores: MutableList<String>,
+        diagnostico: MutableList<String>,
     ) {
         when (evento) {
             is EventoEscaneo.Progreso -> {
@@ -206,6 +216,7 @@ class ScanFlowViewModel(
                     encontradas.toList(),
                     errores.toList(),
                     inicioMs,
+                    diagnostico.toList(),
                 )
             }
             is EventoEscaneo.ListaEncontrada -> {
@@ -224,9 +235,18 @@ class ScanFlowViewModel(
                     _estado.value = estadoActual.copy(errores = errores.toList())
                 }
             }
+            is EventoEscaneo.InfoChat -> {
+                diagnostico += "${evento.chatTitulo}: ${evento.mensajesLeidos} mensajes leídos, " +
+                    "${evento.enlacesCandidatos} enlace(s) candidato(s)"
+                diagnosticoActual = diagnostico.toList()
+                val estadoActual = _estado.value
+                if (estadoActual is EstadoFlujoEscaneo.Escaneando) {
+                    _estado.value = estadoActual.copy(diagnostico = diagnostico.toList())
+                }
+            }
             EventoEscaneo.Finalizado -> {
                 scanJob = null
-                _estado.value = EstadoFlujoEscaneo.Resultados(encontradas.toList(), errores.toList())
+                _estado.value = EstadoFlujoEscaneo.Resultados(encontradas.toList(), errores.toList(), diagnostico.toList())
             }
         }
     }

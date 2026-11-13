@@ -339,6 +339,24 @@ Dos bugs más encontrados al probar el arreglo anterior en el teléfono real:
       ordenada del más reciente al más viejo) para decidir si hay una
       versión más nueva.
 
+## Etapa 10 quater: diagnóstico por chat (mensajes leídos / enlaces candidatos)
+
+Con "0 resultados" y ningún chat marcado como error, no había forma de ver
+desde la app si el chat realmente no tenía mensajes, si tenía mensajes pero
+ninguno con un enlace de lista, o si el enlace sí se encontró pero no quedó
+activo al validarlo. Ahora, tanto en la pantalla de escaneo como en
+Resultados, aparece un panel neutro (no es un error) con una línea por cada
+chat leído con éxito: `<chat>: N mensajes leídos, M enlace(s) candidato(s)`.
+
+- `N = 0` → el chat no tenía mensajes en el rango leído, o no se pudo leer
+  realmente nada (revisar también si aparece en "Chats con error").
+- `N > 0` pero `M = 0` → se leyeron mensajes, pero ninguno tenía un enlace
+  con la forma `.../get.php?...` — puede ser que ese chat no comparta
+  listas en ese formato, o que el enlace esté roto/pegado de forma rara.
+- `M > 0` pero igual sale "0 activas" → el/los enlaces se encontraron bien,
+  el problema está en la validación contra el panel (caído, credenciales
+  vencidas, etc.), no en la lectura de Telegram.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

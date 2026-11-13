@@ -189,7 +189,12 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
 private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewModel) {
     when (estado) {
         is EstadoFlujoEscaneo.Resultados -> {
-            ResultsScreenConectada(listas = estado.listas, errores = estado.errores, onEscanearDeNuevo = viewModel::reiniciar)
+            ResultsScreenConectada(
+                listas = estado.listas,
+                errores = estado.errores,
+                diagnostico = estado.diagnostico,
+                onEscanearDeNuevo = viewModel::reiniciar,
+            )
         }
         is EstadoFlujoEscaneo.Escaneando -> {
             ScanProgressScreen(
@@ -197,6 +202,7 @@ private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlo
                 total = estado.total,
                 encontradas = estado.encontradas,
                 errores = estado.errores,
+                diagnostico = estado.diagnostico,
                 inicioMs = estado.inicioMs,
                 onDetener = viewModel::detenerYVerParciales,
             )
@@ -284,13 +290,19 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                 total = s.total,
                 encontradas = s.encontradas,
                 errores = s.errores,
+                diagnostico = s.diagnostico,
                 inicioMs = s.inicioMs,
                 onDetener = viewModel::detenerYVerParciales,
             )
         }
 
         is EstadoFlujoEscaneo.Resultados -> {
-            ResultsScreenConectada(listas = s.listas, errores = s.errores, onEscanearDeNuevo = viewModel::reiniciar)
+            ResultsScreenConectada(
+                listas = s.listas,
+                errores = s.errores,
+                diagnostico = s.diagnostico,
+                onEscanearDeNuevo = viewModel::reiniciar,
+            )
         }
     }
 }
@@ -306,6 +318,7 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
 private fun ResultsScreenConectada(
     listas: List<ListaValidada>,
     errores: List<String>,
+    diagnostico: List<String> = emptyList(),
     onEscanearDeNuevo: () -> Unit,
 ) {
     val contexto = LocalContext.current
@@ -315,6 +328,7 @@ private fun ResultsScreenConectada(
     ResultsScreen(
         listas = listas,
         errores = errores,
+        diagnostico = diagnostico,
         onEscanearDeNuevo = onEscanearDeNuevo,
         onGuardarTxt = {
             val archivo = ResultadosExportador.guardarArchivo(contexto, listas)

@@ -39,16 +39,32 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         for (chat in chats) {
             val mensajes = try {
                 obtenerMensajesRecientes(chat.id)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 // Antes este error se tragaba en silencio y el chat
                 // simplemente "no encontraba nada" sin avisar por qué.
                 send(EventoEscaneo.ErrorEnChat(chat.titulo, e.message ?: "error desconocido de TDLib"))
-                emptyList()
+                null
             }
-            for (mensaje in mensajes) {
-                val texto = textoDelMensaje(mensaje)
-                if (texto.isBlank()) continue
-                extraerEnlaces(texto).forEach { enlace -> enlacesPorOrigen += chat.titulo to enlace }
+
+            // Si [mensajes] es null fue por un error ya reportado arriba; si
+            // no, se reporta igual cuántos mensajes se leyeron y cuántos
+            // enlaces candidatos salieron de ellos — sin esto, "0 resultados
+            // sin ningún error" no decía si el chat estaba realmente vacío,
+            // si tenía mensajes pero ninguno con enlace, o si el enlace
+            // encontrado simplemente no quedó activo al validar.
+            if (mensajes != null) {
+                var candidatosDeEsteChat = 0
+                for (mensaje in mensajes) {
+                    val texto = textoDelMensaje(mensaje)
+                    if (texto.isBlank()) continue
+                    extraerEnlaces(texto).forEach { enlace ->
+                        enlacesPorOrigen += chat.titulo to enlace
+                        candidatosDeEsteChat++
+                    }
+                }
+                send(EventoEscaneo.InfoChat(chat.titulo, mensajes.size, candidatosDeEsteChat))
             }
         }
 

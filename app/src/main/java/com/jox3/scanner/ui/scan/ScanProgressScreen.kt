@@ -42,6 +42,7 @@ fun ScanProgressScreen(
     total: Int,
     encontradas: List<ListaValidada>,
     errores: List<String> = emptyList(),
+    diagnostico: List<String> = emptyList(),
     inicioMs: Long = System.currentTimeMillis(),
     onDetener: (() -> Unit)? = null,
 ) {
@@ -76,6 +77,11 @@ fun ScanProgressScreen(
         if (errores.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             PanelErrores(errores)
+        }
+
+        if (diagnostico.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            PanelDiagnostico(diagnostico)
         }
 
         if (total > 0) {
@@ -143,6 +149,36 @@ internal fun PanelErrores(errores: List<String>) {
             Spacer(Modifier.height(4.dp))
             errores.forEach { error ->
                 Text("• $error", color = TextoSecundario, fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+/**
+ * Diagnóstico por chat (mensajes leídos / enlaces candidatos encontrados en
+ * ellos) — ver [com.jox3.scanner.scan.EventoEscaneo.InfoChat]. No son
+ * errores, por eso con color neutro: sirve para ver de un vistazo si un
+ * chat sin resultados fue porque no tenía mensajes con enlaces, o porque sí
+ * los tenía pero ninguno quedó activo al validar (eso ya lo dicen los
+ * contadores de Activas/Validadas de arriba).
+ */
+@Composable
+internal fun PanelDiagnostico(diagnostico: List<String>) {
+    Surface(
+        color = SuperficieApp,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(
+                "Diagnóstico por chat",
+                color = TextoPrimario,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(4.dp))
+            diagnostico.forEach { linea ->
+                Text("• $linea", color = TextoSecundario, fontSize = 11.sp)
             }
         }
     }
