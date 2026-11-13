@@ -146,4 +146,27 @@ class TdLibAuthClient(
             }
         }
     }
+
+    companion object {
+        @Volatile
+        private var instancia: TdLibAuthClient? = null
+
+        /**
+         * TDLib solo permite que **un** `Client` tenga abierta a la vez la
+         * base de datos local (`databaseDirectory`); un segundo `Client`
+         * apuntando a la misma carpeta falla con
+         * "Can't lock file ... because it is already in use by current
+         * program". Si cada recreación de `MainActivity` (por ejemplo, al
+         * salir y volver a entrar sin que Android mate el proceso del todo)
+         * crea un `TdLibAuthClient` nuevo vía `remember { ... }`, el objeto
+         * viejo — y su `Client` nativo — nunca se cierra, así que el nuevo
+         * choca con él. La solución es que exista un único `TdLibAuthClient`
+         * por proceso, reutilizado aunque se recree la Activity.
+         */
+        fun obtenerInstancia(contexto: Context, credenciales: CredencialesApiTelegram): TdLibAuthClient {
+            return instancia ?: synchronized(this) {
+                instancia ?: TdLibAuthClient(contexto.applicationContext, credenciales).also { instancia = it }
+            }
+        }
+    }
 }

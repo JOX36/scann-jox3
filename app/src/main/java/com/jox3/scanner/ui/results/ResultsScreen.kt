@@ -36,7 +36,7 @@ fun ResultsScreen(listas: List<ListaValidada>, onEscanearDeNuevo: () -> Unit) {
         Spacer(Modifier.height(16.dp))
 
         if (listas.isEmpty()) {
-            Text("No se encontraron enlaces en los chats seleccionados.", color = TextoSecundario, fontSize = 13.sp)
+            Text("No se encontraron enlaces con este modo de búsqueda.", color = TextoSecundario, fontSize = 13.sp)
         } else {
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(listas) { lista -> FilaListaEncontrada(lista) }
@@ -45,7 +45,7 @@ fun ResultsScreen(listas: List<ListaValidada>, onEscanearDeNuevo: () -> Unit) {
 
         Spacer(Modifier.height(12.dp))
         Button(onClick = onEscanearDeNuevo, modifier = Modifier.fillMaxWidth()) {
-            Text("Escanear otros chats")
+            Text("Escanear de nuevo")
         }
     }
 }
