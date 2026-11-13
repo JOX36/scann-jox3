@@ -4,6 +4,7 @@ import com.jox3.scanner.scan.data.CredencialesXtream
 import com.jox3.scanner.update.NetworkModule
 import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
 import kotlinx.serialization.Serializable
@@ -31,13 +32,28 @@ private data class CanalLive(val name: String? = null)
  */
 object XtreamClient {
 
-    private fun urlBase(cred: CredencialesXtream) =
-        "${cred.host}/player_api.php?username=${cred.username}&password=${cred.password}"
+    private val urlPlayerApi = { cred: CredencialesXtream -> "${cred.host}/player_api.php" }
 
-    /** `true` si la cuenta existe y está activa (`auth == 1` y `status == "Active"`). */
+    /**
+     * `true` si la cuenta existe y está activa (`auth == 1` y
+     * `status == "Active"`).
+     *
+     * El usuario y la contraseña se mandan con `parameter(...)`, no
+     * pegados a mano en el string de la URL: muchos proveedores generan
+     * contraseñas con caracteres como `&`, `+` o `#`, que si van crudos
+     * rompen la query (el `&` abre un parámetro nuevo, el `#` corta todo
+     * lo que sigue como si fuera un fragmento). Antes, con esos
+     * caracteres sin escapar, la petición le llegaba mal al panel —o Ktor
+     * la rechazaba antes de mandarla— y la lista quedaba marcada como
+     * "inactiva" sin serlo de verdad. `parameter(...)` codifica el valor
+     * (%XX) automáticamente, igual que haría cualquier navegador.
+     */
     suspend fun verificarCuenta(cred: CredencialesXtream): Boolean {
         return runCatching {
-            val respuesta: RespuestaCuenta = NetworkModule.cliente.get(urlBase(cred)).body()
+            val respuesta: RespuestaCuenta = NetworkModule.cliente.get(urlPlayerApi(cred)) {
+                parameter("username", cred.username)
+                parameter("password", cred.password)
+            }.body()
             respuesta.user_info?.auth == 1 && respuesta.user_info.status == "Active"
         }.getOrDefault(false)
     }
@@ -56,8 +72,11 @@ object XtreamClient {
 
     private suspend fun obtenerCategoria(cred: CredencialesXtream, accion: String): List<String> {
         return runCatching {
-            val categorias: List<Categoria> =
-                NetworkModule.cliente.get("${urlBase(cred)}&action=$accion").body()
+            val categorias: List<Categoria> = NetworkModule.cliente.get(urlPlayerApi(cred)) {
+                parameter("username", cred.username)
+                parameter("password", cred.password)
+                parameter("action", accion)
+            }.body()
             categorias.mapNotNull { it.category_name }
         }.getOrDefault(emptyList())
     }
@@ -68,8 +87,11 @@ object XtreamClient {
      */
     suspend fun obtenerMuestraCanales(cred: CredencialesXtream, limite: Int = 300): List<String> {
         return runCatching {
-            val canales: List<CanalLive> =
-                NetworkModule.cliente.get("${urlBase(cred)}&action=get_live_streams").body()
+            val canales: List<CanalLive> = NetworkModule.cliente.get(urlPlayerApi(cred)) {
+                parameter("username", cred.username)
+                parameter("password", cred.password)
+                parameter("action", "get_live_streams")
+            }.body()
             canales.mapNotNull { it.name }.take(limite)
         }.getOrDefault(emptyList())
     }

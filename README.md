@@ -180,6 +180,42 @@ Se investigaron y se arreglaron juntos, en un solo lote:
       desplazarse por toda la lista a mano — útil ahora que se cargan todos
       los chats, no solo los primeros 100.
 
+## Etapa 8: por qué el escaneo daba 0 activas o marcaba todo como inactivo
+
+Dos videos del usuario mostraron, en chats distintos, dos síntomas que
+parecían no tener relación ("0 activas de 0" con decenas de enlaces
+encontrados, y "todas inactivas" en otro chat) pero compartían la misma
+raíz: el motor de validación nunca se probó contra mensajes reales de
+canales de IPTV, que vienen con basura pegada al enlace y casi siempre
+sirven el panel por `http://` plano.
+
+- [x] **`extraerCredencialesXtream` reventaba con enlaces reales**: usaba
+      `io.ktor.http.Url`, que valida la URL contra la gramática RFC 3986 y
+      lanza una excepción ante cualquier cosa fuera de lo esperado. Los
+      canales de IPTV suelen pegar el enlace directo a emojis/decoración
+      sin espacio de por medio (`...type=m3u_plus🔥🔥`), así que la regex
+      de extracción los capturaba como parte del enlace y `Url(...)`
+      fallaba con cada uno — la causa real de un escaneo con decenas de
+      enlaces "validados" que terminaba en "0 activas de 0". Reemplazado
+      por un parseo manual (separar por `://`, `/`, `?`, `&`, `=`), igual
+      de permisivo que el `urlsplit`/`parse_qs` que ya usaba el script de
+      Python, más un recorte de la basura pegada al final de cada enlace
+      capturado.
+- [x] **Android bloqueaba todo el tráfico sin cifrar**: desde Android 9
+      (API 28), el sistema rechaza por defecto cualquier petición
+      `http://` (sin TLS) si la app no lo permite explícitamente. Los
+      paneles Xtream casi siempre se sirven así, nunca por `https://`, así
+      que *toda* verificación de lista fallaba antes de salir del
+      teléfono y volvía como "Inactiva" sin importar si el panel sí
+      funcionaba. Arreglado con `android:usesCleartextTraffic="true"` en
+      `AndroidManifest.xml`.
+- [x] **`XtreamClient` pegaba usuario/contraseña crudos en el string de la
+      URL**: una contraseña generada por el proveedor con `&`, `+` o `#`
+      rompía la query igual que el problema anterior (`&` abre un
+      parámetro nuevo, `#` corta todo lo que sigue). Reemplazado por
+      `parameter(...)` de Ktor, que codifica (%XX) el valor
+      automáticamente antes de mandarlo, igual que un navegador.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

@@ -16,7 +16,17 @@
         android:allowBackup="false"
         android:label="IPTV Scanner"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
-        tools:replace="android:allowBackup,android:label">
+        tools:replace="android:allowBackup,android:label"
+        android:usesCleartextTraffic="true">
+        <!--
+            usesCleartextTraffic: los paneles Xtream casi siempre se sirven
+            por "http://" sin TLS (nunca "https://"). Desde Android 9
+            (API 28) el sistema bloquea TODO tráfico sin cifrar por
+            defecto, así que sin esto cada verificación de lista fallaba
+            antes de salir del teléfono y volvía como "Inactiva" aunque el
+            panel sí funcionara — el motivo real de que un escaneo marcara
+            el 100% de las listas encontradas como inactivas.
+        -->
 
         <activity
             android:name=".MainActivity"
