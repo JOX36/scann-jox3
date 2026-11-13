@@ -37,6 +37,7 @@ import com.jox3.scanner.ui.scan.ScanProgressScreen
 import com.jox3.scanner.ui.setup.ApiCredentialsScreen
 import com.jox3.scanner.ui.theme.AcentoApp
 import com.jox3.scanner.ui.theme.ScannJox3Theme
+import com.jox3.scanner.BuildConfig
 import com.jox3.scanner.update.InfoActualizacion
 import com.jox3.scanner.update.UpdateBanner
 import com.jox3.scanner.update.UpdateViewModel
@@ -91,7 +92,7 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
     }
 
     LaunchedEffect(Unit) {
-        updateViewModel.comprobarActualizacion(versionInstalada = "0.1.0")
+        updateViewModel.comprobarActualizacion(versionInstalada = BuildConfig.VERSION_NAME)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
