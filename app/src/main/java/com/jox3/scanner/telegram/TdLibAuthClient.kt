@@ -10,6 +10,7 @@ import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import java.util.Locale
 import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * Implementación real de [TelegramAuthClient] contra TDLib, usando la

@@ -17,7 +17,7 @@ class TdChatsRepository(private val sesion: TdLibAuthClient) : ChatsRepository {
         val chats = sesion.enviarYEsperar(TdApi.GetChats(TdApi.ChatListMain(), LIMITE)) as? TdApi.Chats
             ?: return emptyList()
 
-        return chats.chatIds.mapNotNull { chatId ->
+        return chats.chatIds.toList().mapNotNull { chatId ->
             val chat = sesion.enviarYEsperar(TdApi.GetChat(chatId)) as? TdApi.Chat ?: return@mapNotNull null
             ChatTelegram(
                 id = chatId,
