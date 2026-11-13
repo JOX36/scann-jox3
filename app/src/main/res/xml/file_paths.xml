@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+        Expone la subcarpeta donde DescargadorActualizacion guarda el .apk
+        descargado, para que FileProvider pueda compartirla con el
+        instalador del sistema (ver UpdateDownloadReceiver).
+    -->
+    <external-files-path
+        name="actualizaciones"
+        path="." />
+</paths>

@@ -21,6 +21,24 @@ Proyecto separado de iptv-exo (el reproductor); este solo escanea y valida.
       tiempos de red (acepta cualquier teléfono y el código `12345`), para
       poder probar y ajustar toda la UI sin depender de la build nativa.
 
+## Estado actual (Etapa 2)
+
+- [x] Comprobación de actualizaciones contra GitHub Releases
+      (`GET /repos/JOX36/scann-jox3/releases/latest`)
+- [x] Descarga del `.apk` adjunto al release con el `DownloadManager` del
+      sistema
+- [x] Flujo de permiso "instalar apps desconocidas" + instalación vía
+      `FileProvider` cuando termina la descarga
+- [ ] El `.apk` debe subirse manualmente (o por CI, en un paso futuro) como
+      asset de cada release en GitHub, con el nombre `app-debug.apk` (o
+      cualquier nombre que termine en `.apk` si ese no se encuentra)
+- [ ] No hay comprobación periódica en segundo plano todavía: solo se
+      comprueba al abrir la app
+
+La actualización es siempre semi-automática, igual que en iptv-exo: la app
+avisa y descarga, pero el usuario confirma la instalación en la pantalla
+estándar de Android — nunca se instala nada en silencio.
+
 ## Por qué TDLib queda pendiente como paso aparte
 
 TDLib es la librería oficial de Telegram para actuar como una cuenta de

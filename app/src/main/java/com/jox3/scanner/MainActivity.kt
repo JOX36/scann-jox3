@@ -2,11 +2,16 @@ package com.jox3.scanner
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,6 +23,9 @@ import com.jox3.scanner.ui.login.LoginScreen
 import com.jox3.scanner.ui.login.LoginViewModel
 import com.jox3.scanner.ui.login.LoginViewModelFactory
 import com.jox3.scanner.ui.theme.ScannJox3Theme
+import com.jox3.scanner.update.InfoActualizacion
+import com.jox3.scanner.update.UpdateBanner
+import com.jox3.scanner.update.UpdateViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -35,11 +43,43 @@ class MainActivity : ComponentActivity() {
                         val viewModel = viewModel<LoginViewModel>(factory = LoginViewModelFactory(authClient))
                         LoginScreen(viewModel = viewModel, onAutenticado = { autenticado = true })
                     } else {
-                        PantallaPlaceholderInicio()
+                        PantallaPrincipal()
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PantallaPrincipal() {
+    val updateViewModel: UpdateViewModel = viewModel()
+    val estadoActualizacion by updateViewModel.estado.collectAsState()
+
+    // Launcher para volver de la pantalla de "Instalar apps desconocidas"
+    // y reintentar la descarga si el usuario concedió el permiso.
+    var infoPendientePermiso by remember { mutableStateOf<InfoActualizacion?>(null) }
+    val lanzadorAjustesPermiso = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        infoPendientePermiso?.let { updateViewModel.permisoConcedidoReintentarDescarga(it) }
+        infoPendientePermiso = null
+    }
+
+    LaunchedEffect(Unit) {
+        updateViewModel.comprobarActualizacion(versionInstalada = "0.1.0")
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        UpdateBanner(
+            estado = estadoActualizacion,
+            onActualizar = { info -> updateViewModel.iniciarDescarga(info) },
+            onAbrirAjustesPermiso = { info ->
+                infoPendientePermiso = info
+                lanzadorAjustesPermiso.launch(updateViewModel.intentSolicitarPermiso())
+            },
+        )
+        PantallaPlaceholderInicio()
     }
 }
 
