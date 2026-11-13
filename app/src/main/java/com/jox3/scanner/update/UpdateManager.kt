@@ -9,7 +9,17 @@ import io.ktor.http.HttpStatusCode
 /** Repositorio de GitHub donde se publican los releases con el .apk. */
 private const val OWNER = "JOX36"
 private const val REPO = "scann-jox3"
-private const val URL_ULTIMO_RELEASE = "https://api.github.com/repos/$OWNER/$REPO/releases/latest"
+
+/**
+ * El workflow de CI publica cada release con `--prerelease` (es un .apk de
+ * debug, no una versión "estable"), y `/releases/latest` de GitHub EXCLUYE
+ * por diseño cualquier release marcado como prerelease o draft — con todos
+ * los releases de este repo marcados así, ese endpoint siempre respondía 404
+ * y la app nunca detectaba ninguna actualización, por nueva que fuera. Se
+ * usa en cambio la lista de releases (que sí incluye prereleases) y se toma
+ * el primero: GitHub ya la devuelve ordenada del más reciente al más viejo.
+ */
+private const val URL_RELEASES = "https://api.github.com/repos/$OWNER/$REPO/releases?per_page=1"
 
 /** Nombre esperado del asset .apk dentro de cada release. */
 private const val NOMBRE_APK_ESPERADO = "app-debug.apk"
@@ -35,15 +45,15 @@ suspend fun buscarActualizacion(
     versionInstalada: String,
 ): InfoActualizacion? {
     val respuesta = runCatching {
-        httpClient.get(URL_ULTIMO_RELEASE) {
+        httpClient.get(URL_RELEASES) {
             header("Accept", "application/vnd.github+json")
         }
     }.getOrNull() ?: return null
 
     if (respuesta.status != HttpStatusCode.OK) return null
 
-    val release = runCatching { respuesta.body<com.jox3.scanner.update.GithubRelease>() }
-        .getOrNull() ?: return null
+    val release = runCatching { respuesta.body<List<com.jox3.scanner.update.GithubRelease>>() }
+        .getOrNull()?.firstOrNull() ?: return null
 
     if (!esVersionMasNueva(versionInstalada, release.tag_name)) return null
 

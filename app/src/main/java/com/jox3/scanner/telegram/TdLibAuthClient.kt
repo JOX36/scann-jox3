@@ -166,7 +166,16 @@ class TdLibAuthClient(
     }
 
     companion object {
-        private const val TIMEOUT_TDLIB_MS = 15_000L
+        // Telegram puede aplicar un FLOOD_WAIT a métodos como
+        // GetForumTopicHistory si se piden muchos temas seguidos; TDLib lo
+        // reintenta solo por dentro sin avisar, así que desde acá se ve
+        // igual que si nunca fuera a responder. 25s da margen para esos
+        // casos sin dejar que un chat puntual trabe el escaneo para
+        // siempre (y ahora, en el caso de los temas de un foro, que un
+        // tema puntual tarde más de esto ya no tira a la basura los
+        // mensajes de los demás temas — ver [obtenerMensajesDeForo] en
+        // TdEscanerRepository).
+        private const val TIMEOUT_TDLIB_MS = 25_000L
 
         @Volatile
         private var instancia: TdLibAuthClient? = null

@@ -5,6 +5,7 @@ import com.jox3.scanner.scan.data.extraerCredencialesXtream
 import com.jox3.scanner.scan.data.extraerEnlaces
 import com.jox3.scanner.scan.engine.validarYEnriquecer
 import com.jox3.scanner.telegram.TdLibAuthClient
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -164,11 +165,29 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
      * ([GetForumTopicHistory], con el mismo reintento ante páginas vacías
      * que [obtenerMensajesDeHistorialNormal]) — cada tema puede aportar
      * hasta [limitePorTema] mensajes.
+     *
+     * Antes, si UN solo tema no respondía a tiempo (visto en la práctica:
+     * `GetForumTopicHistory` puede tardar más de los 15s de margen si
+     * Telegram aplica un FLOOD_WAIT a ese método — TDLib lo reintenta por
+     * dentro sin avisar, así que desde acá se ve como si nunca respondiera),
+     * la excepción se propagaba y se perdían TAMBIÉN los mensajes de los
+     * temas anteriores que sí habían respondido bien, marcando el chat
+     * entero como "no se pudo leer" aunque la mayoría de temas funcionara.
+     * Ahora cada tema se intenta por separado: uno que falle no tira el
+     * resto a la basura.
      */
     private suspend fun obtenerMensajesDeForo(chatId: Long, limitePorTema: Int): List<TdApi.Message> {
         val mensajes = mutableListOf<TdApi.Message>()
         for (temaId in obtenerIdsDeTemas(chatId)) {
-            mensajes += obtenerMensajesDeTema(chatId, temaId, limitePorTema)
+            try {
+                mensajes += obtenerMensajesDeTema(chatId, temaId, limitePorTema)
+            } catch (e: CancellationException) {
+                throw e // un cancelado real (ej. "Detener y ver parciales") sí debe propagarse
+            } catch (e: Exception) {
+                // Se sigue con el resto de temas; si todos fallan, el chat
+                // queda igual que antes (0 mensajes), pero si solo uno
+                // falla ya no se pierde lo que los demás sí trajeron.
+            }
         }
         return mensajes
     }

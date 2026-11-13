@@ -3,9 +3,9 @@ package com.jox3.scanner.update
 import kotlinx.serialization.Serializable
 
 /**
- * Representa la respuesta de la API pública de GitHub para el "release" más
- * reciente de este repositorio:
- *   GET https://api.github.com/repos/{owner}/{repo}/releases/latest
+ * Representa un elemento de la respuesta de la API pública de GitHub con la
+ * lista de releases de este repositorio:
+ *   GET https://api.github.com/repos/{owner}/{repo}/releases
  *
  * Solo se mapean los campos que realmente usamos; el resto de los que
  * devuelve GitHub se ignoran automáticamente.

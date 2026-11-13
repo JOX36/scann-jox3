@@ -312,6 +312,33 @@ más de 5 minutos.
       la pantalla de escaneo) y el escaneo sigue con el resto de chats en
       vez de quedarse trabado para siempre.
 
+## Etapa 10 ter: chats con "Temas" seguían fallando del todo por un tema puntual + la app nunca detectaba actualizaciones
+
+Dos bugs más encontrados al probar el arreglo anterior en el teléfono real:
+
+- [x] **Un tema de un foro que tarda más de lo normal tiraba a la basura
+      TODO el chat**: con el timeout de TDLib ya puesto (Etapa 10 bis), un
+      chat con Temas donde un tema puntual tardaba más de la cuenta en
+      responder a `GetForumTopicHistory` (visto en la práctica: Telegram
+      puede aplicar un `FLOOD_WAIT` a ese método si se piden muchos temas
+      seguidos, y TDLib lo reintenta por dentro sin avisar — desde acá se
+      ve igual que si nunca fuera a responder) hacía que se perdieran
+      TAMBIÉN los mensajes de los demás temas de ese mismo chat que sí
+      habían respondido bien, y el chat completo quedaba marcado como "no
+      se pudo leer". Ahora cada tema se intenta por separado: uno que
+      falle ya no tira el resto a la basura, y el timeout por petición
+      sube de 15s a 25s para dar más margen a un posible `FLOOD_WAIT`.
+- [x] **La app nunca detectaba actualizaciones, aunque hubiera una nueva**:
+      el workflow de CI publica cada release con `--prerelease` (es un
+      .apk de debug, no una versión "estable"), y el endpoint de GitHub
+      que usaba la app (`/releases/latest`) EXCLUYE por diseño cualquier
+      release marcado como prerelease o draft — con todos los releases de
+      este repo marcados así, ese endpoint siempre respondía 404 y la app
+      nunca encontraba nada que ofrecer. Se cambió a la lista de releases
+      (`/releases?per_page=1`, que sí incluye prereleases y ya viene
+      ordenada del más reciente al más viejo) para decidir si hay una
+      versión más nueva.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
