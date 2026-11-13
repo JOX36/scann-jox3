@@ -242,6 +242,55 @@ separadas, como "General", etc.).
       mismo reintento ante páginas vacías que ya se usaba para
       `GetChatHistory`) en vez de una sola llamada al historial general.
 
+## Etapa 10: pantalla de Resultados a juego con el diseño + enviar a Telegram
+
+El diseño que se propuso para Resultados (chips de Activas/Validadas/LATAM,
+filtros Todas/Por vencer/LATAM, insignia de días para vencer, botones
+Guardar .txt / Enviar a Telegram) ahora refleja los mismos datos que ya
+calculaba `validate_m3u_url()` en el script de Python — no datos inventados:
+
+- [x] **Días para vencer, conexiones, zona horaria**: `XtreamClient` ahora
+      trae en una sola llamada a `player_api.php` lo mismo que Python
+      (`exp_date` → días restantes, `active_cons`/`max_connections`,
+      `is_trial`, `server_info.timezone`). El diseño original mostraba una
+      "ubicación" (ciudad/país) que no existe en los datos reales — no hay
+      geolocalización en el script de Python, así que en vez de inventarla
+      se muestra la zona horaria real que sí da el panel.
+- [x] **Cantidad de canales**: se reutiliza la misma llamada a
+      `get_live_streams` que ya se hacía para la detección LATAM (antes
+      recortada a 300 para esa muestra); ahora se pide completa y se usa
+      tanto para la muestra como para el conteo, sin pedirla dos veces.
+- [x] **Filtros Todas / Por vencer / LATAM**: "Por vencer" son las listas
+      activas con menos de 15 días restantes — mismo umbral de color
+      (amarillo) que usaba el script de Python en su tabla.
+- [x] **"Detener y ver resultados parciales"**: cancela el escaneo donde
+      vaya y pasa a Resultados con lo ya encontrado, en vez de esperar a
+      que termine de validar todos los enlaces candidatos.
+- [x] **Guardar .txt / Enviar a Telegram**: "Guardar" arma un archivo con
+      el mismo contenido que escribía Python y abre el selector de apps
+      del sistema para guardarlo o compartirlo. "Enviar a Telegram" lo
+      manda a un bot — equivalente a `send_file_to_telegram()`, pero el
+      `BOT_TOKEN`/`CHAT_ID` se configuran en Ajustes y se guardan cifrados
+      en el dispositivo (ver `CredencialesBotTelegram`), nunca en el `.env`
+      ni en el repositorio.
+
+## Etapa 9 bis: por qué el escaneo se quedaba pegado para siempre validando
+
+Un bug distinto al de la Etapa 9: ya con los enlaces bien extraídos, el
+escaneo podía quedarse congelado en "0 de N enlaces validados" sin avanzar
+nunca y sin ningún error visible.
+
+- [x] **Sin timeout + validación uno por uno**: `NetworkModule` no tenía
+      ningún timeout configurado — una conexión a un panel vencido que
+      nunca responde (ni rechaza la conexión, simplemente no contesta) se
+      queda esperando indefinidamente. Como además los enlaces se
+      validaban de a uno (secuencial), bastaba UN solo panel así entre
+      decenas/cientos de enlaces reales para trabar el escaneo completo.
+      El script de Python ya evitaba esto con `REQUEST_TIMEOUT` (10s) y
+      `MAX_CONCURRENT_VALIDATIONS` (50 en paralelo); acá es el mismo
+      arreglo: `HttpTimeout` de 10s en Ktor y validación en paralelo con
+      un `Semaphore(50)`.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

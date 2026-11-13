@@ -1,24 +1,48 @@
 package com.jox3.scanner.ui.results
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jox3.scanner.scan.engine.ListaValidada
-import com.jox3.scanner.ui.scan.FilaListaEncontrada
 import com.jox3.scanner.ui.scan.PanelErrores
+import com.jox3.scanner.ui.theme.AcentoApp
+import com.jox3.scanner.ui.theme.AmarilloApp
+import com.jox3.scanner.ui.theme.ErrorApp
+import com.jox3.scanner.ui.theme.SuperficieApp
+import com.jox3.scanner.ui.theme.TextoPrimario
 import com.jox3.scanner.ui.theme.TextoSecundario
+
+/** Días restantes por debajo de los cuales una lista activa se considera "por vencer" (igual que Python). */
+private const val UMBRAL_POR_VENCER = 15
+
+private enum class FiltroResultados(val etiqueta: String) {
+    TODAS("Todas"),
+    POR_VENCER("Por vencer"),
+    LATAM("LATAM"),
+}
 
 /** Pantalla "Resultados": el resumen final, igual que `print_scan_summary` del script de Python. */
 @Composable
@@ -26,45 +50,162 @@ fun ResultsScreen(
     listas: List<ListaValidada>,
     onEscanearDeNuevo: () -> Unit,
     errores: List<String> = emptyList(),
+    onGuardarTxt: (() -> Unit)? = null,
+    onEnviarTelegram: (() -> Unit)? = null,
 ) {
     val activas = listas.filter { it.activa }
     val latam = activas.filter { it.esLatino }
+    val porVencer = activas.filter { it.diasRestantes != null && it.diasRestantes < UMBRAL_POR_VENCER }
+
+    var filtro by remember { mutableStateOf(FiltroResultados.TODAS) }
+    val listaMostrada = when (filtro) {
+        FiltroResultados.TODAS -> activas
+        FiltroResultados.POR_VENCER -> porVencer
+        FiltroResultados.LATAM -> latam
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
         Text("Resultados", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "${activas.size} activas de ${listas.size}  ·  ${latam.size} de ${activas.size} son LATAM",
-            color = TextoSecundario,
-            fontSize = 13.sp,
-        )
+        Spacer(Modifier.height(12.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            EstadisticaChip("Activas", activas.size.toString(), AcentoApp, Modifier.weight(1f))
+            EstadisticaChip("Validadas", listas.size.toString(), TextoPrimario, Modifier.weight(1f))
+            EstadisticaChip("LATAM", latam.size.toString(), AmarilloApp, Modifier.weight(1f))
+        }
 
         if (errores.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             PanelErrores(errores)
         }
 
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FiltroResultados.entries.forEach { opcion ->
+                FiltroChip(opcion.etiqueta, seleccionado = filtro == opcion, onClick = { filtro = opcion })
+            }
+        }
+
         Spacer(Modifier.height(16.dp))
 
-        if (listas.isEmpty()) {
+        if (listaMostrada.isEmpty()) {
             Text(
-                if (errores.isNotEmpty()) {
-                    "No se encontraron enlaces. Revisa los chats con error arriba: puede ser la causa real."
-                } else {
-                    "No se encontraron enlaces con este modo de búsqueda."
+                when {
+                    listas.isEmpty() && errores.isNotEmpty() ->
+                        "No se encontraron enlaces. Revisa los chats con error arriba: puede ser la causa real."
+                    listas.isEmpty() -> "No se encontraron enlaces con este modo de búsqueda."
+                    else -> "Ninguna lista coincide con este filtro."
                 },
                 color = TextoSecundario,
                 fontSize = 13.sp,
             )
         } else {
             LazyColumn(modifier = Modifier.weight(1f)) {
-                items(listas) { lista -> FilaListaEncontrada(lista) }
+                items(listaMostrada) { lista -> FilaResultado(lista) }
             }
         }
 
         Spacer(Modifier.height(12.dp))
+        if (onGuardarTxt != null || onEnviarTelegram != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                if (onGuardarTxt != null) {
+                    OutlinedButton(onClick = onGuardarTxt, modifier = Modifier.weight(1f)) {
+                        Text("Guardar .txt")
+                    }
+                }
+                if (onEnviarTelegram != null) {
+                    Button(onClick = onEnviarTelegram, modifier = Modifier.weight(1f)) {
+                        Text("Enviar a Telegram")
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
         Button(onClick = onEscanearDeNuevo, modifier = Modifier.fillMaxWidth()) {
             Text("Escanear de nuevo")
         }
+    }
+}
+
+@Composable
+private fun EstadisticaChip(etiqueta: String, valor: String, colorValor: Color, modifier: Modifier = Modifier) {
+    Surface(color = SuperficieApp, shape = RoundedCornerShape(12.dp), modifier = modifier) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Text(valor, color = colorValor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(etiqueta, color = TextoSecundario, fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+private fun FiltroChip(etiqueta: String, seleccionado: Boolean, onClick: () -> Unit) {
+    Surface(
+        color = if (seleccionado) AcentoApp else SuperficieApp,
+        shape = RoundedCornerShape(50),
+        onClick = onClick,
+    ) {
+        Text(
+            etiqueta,
+            color = if (seleccionado) Color(0xFF06231F) else TextoSecundario,
+            fontSize = 13.sp,
+            fontWeight = if (seleccionado) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+    }
+}
+
+/**
+ * Fila de resultado con los mismos datos que ya calcula
+ * `validate_m3u_url()` en Python: días para vencer (o "Expirada"),
+ * conexiones activas/máximas, zona horaria del servidor (no hay
+ * geolocalización real — se usa este dato en vez de inventar una
+ * ubicación) y cantidad de canales.
+ */
+@Composable
+internal fun FilaResultado(lista: ListaValidada) {
+    Surface(
+        color = SuperficieApp,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(lista.credenciales.host, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                InsigniaVencimiento(lista.diasRestantes)
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (lista.conexionesMax != null) {
+                    Text("🔗 ${lista.conexionesActivas ?: 0}/${lista.conexionesMax}", color = TextoSecundario, fontSize = 12.sp)
+                }
+                if (!lista.zonaHoraria.isNullOrBlank()) {
+                    Text("🕐 ${lista.zonaHoraria}", color = TextoSecundario, fontSize = 12.sp)
+                }
+                if (lista.cantidadCanales != null) {
+                    Text("📶 ${lista.cantidadCanales} canales", color = TextoSecundario, fontSize = 12.sp)
+                }
+            }
+            if (lista.esLatino) {
+                Spacer(Modifier.height(4.dp))
+                Text("🌎 LATAM · ${(lista.porcentajeLatino * 100).toInt()}%", color = AcentoApp, fontSize = 12.sp)
+            }
+            Text("Origen: ${lista.origenChat}", color = TextoSecundario, fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+private fun InsigniaVencimiento(diasRestantes: Int?) {
+    val (texto, color) = when {
+        diasRestantes == null -> "Sin vencimiento" to TextoSecundario
+        diasRestantes < 0 -> "Expirada" to ErrorApp
+        diasRestantes < UMBRAL_POR_VENCER -> "$diasRestantes días" to AmarilloApp
+        else -> "$diasRestantes días" to AcentoApp
+    }
+    Surface(color = color.copy(alpha = 0.18f), shape = RoundedCornerShape(50)) {
+        Text(texto, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
     }
 }

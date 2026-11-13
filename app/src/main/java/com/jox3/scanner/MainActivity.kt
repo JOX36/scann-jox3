@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -26,20 +27,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.jox3.scanner.results.ResultadosExportador
 import com.jox3.scanner.scan.EstadoFlujoEscaneo
 import com.jox3.scanner.scan.ScanFlowViewModel
 import com.jox3.scanner.scan.ScanFlowViewModelFactory
 import com.jox3.scanner.scan.TdChatsRepository
 import com.jox3.scanner.scan.TdEscanerRepository
 import com.jox3.scanner.scan.TipoModo
+import com.jox3.scanner.scan.engine.ListaValidada
 import com.jox3.scanner.telegram.CredencialesApiTelegram
+import com.jox3.scanner.telegram.CredencialesBotTelegram
 import com.jox3.scanner.telegram.TdLibAuthClient
+import com.jox3.scanner.telegram.TelegramBotClient
 import com.jox3.scanner.ui.chats.ChatsScreen
 import com.jox3.scanner.ui.chats.SeleccionarChatScreen
 import com.jox3.scanner.ui.login.LoginScreen
@@ -56,6 +62,7 @@ import com.jox3.scanner.ui.theme.ScannJox3Theme
 import com.jox3.scanner.BuildConfig
 import com.jox3.scanner.update.InfoActualizacion
 import com.jox3.scanner.update.UpdateViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -153,18 +160,25 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
             when (Pestana.entries[pestanaActual]) {
                 Pestana.BUSCAR -> PantallaEscaneo(estadoEscaneo, scanViewModel)
                 Pestana.RESULTADOS -> PantallaResultadosTab(estadoEscaneo, scanViewModel)
-                Pestana.AJUSTES -> AjustesScreen(
-                    versionInstalada = BuildConfig.VERSION_NAME,
-                    estadoActualizacion = estadoActualizacion,
-                    onComprobarActualizacion = {
-                        updateViewModel.comprobarActualizacion(versionInstalada = BuildConfig.VERSION_NAME)
-                    },
-                    onActualizar = { info -> updateViewModel.iniciarDescarga(info) },
-                    onAbrirAjustesPermiso = { info ->
-                        infoPendientePermiso = info
-                        lanzadorAjustesPermiso.launch(updateViewModel.intentSolicitarPermiso())
-                    },
-                )
+                Pestana.AJUSTES -> {
+                    val contexto = LocalContext.current
+                    val credencialesBot = remember { CredencialesBotTelegram(contexto) }
+                    AjustesScreen(
+                        versionInstalada = BuildConfig.VERSION_NAME,
+                        estadoActualizacion = estadoActualizacion,
+                        onComprobarActualizacion = {
+                            updateViewModel.comprobarActualizacion(versionInstalada = BuildConfig.VERSION_NAME)
+                        },
+                        onActualizar = { info -> updateViewModel.iniciarDescarga(info) },
+                        onAbrirAjustesPermiso = { info ->
+                            infoPendientePermiso = info
+                            lanzadorAjustesPermiso.launch(updateViewModel.intentSolicitarPermiso())
+                        },
+                        botTokenGuardado = credencialesBot.obtenerBotToken(),
+                        chatIdGuardado = credencialesBot.obtenerChatId(),
+                        onGuardarBot = { token, chatId -> credencialesBot.guardar(token, chatId) },
+                    )
+                }
             }
         }
     }
@@ -175,7 +189,7 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
 private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewModel) {
     when (estado) {
         is EstadoFlujoEscaneo.Resultados -> {
-            ResultsScreen(listas = estado.listas, errores = estado.errores, onEscanearDeNuevo = viewModel::reiniciar)
+            ResultsScreenConectada(listas = estado.listas, errores = estado.errores, onEscanearDeNuevo = viewModel::reiniciar)
         }
         is EstadoFlujoEscaneo.Escaneando -> {
             ScanProgressScreen(
@@ -183,6 +197,8 @@ private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlo
                 total = estado.total,
                 encontradas = estado.encontradas,
                 errores = estado.errores,
+                inicioMs = estado.inicioMs,
+                onDetener = viewModel::detenerYVerParciales,
             )
         }
         else -> {
@@ -268,13 +284,57 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                 total = s.total,
                 encontradas = s.encontradas,
                 errores = s.errores,
+                inicioMs = s.inicioMs,
+                onDetener = viewModel::detenerYVerParciales,
             )
         }
 
         is EstadoFlujoEscaneo.Resultados -> {
-            ResultsScreen(listas = s.listas, errores = s.errores, onEscanearDeNuevo = viewModel::reiniciar)
+            ResultsScreenConectada(listas = s.listas, errores = s.errores, onEscanearDeNuevo = viewModel::reiniciar)
         }
     }
+}
+
+/**
+ * [ResultsScreen] con "Guardar .txt" y "Enviar a Telegram" ya conectados:
+ * el primero arma el archivo y abre el selector de apps del sistema para
+ * guardarlo/compartirlo; el segundo lo manda al bot configurado en
+ * Ajustes ([CredencialesBotTelegram]) — equivalente a
+ * `send_file_to_telegram()` del script de Python.
+ */
+@Composable
+private fun ResultsScreenConectada(
+    listas: List<ListaValidada>,
+    errores: List<String>,
+    onEscanearDeNuevo: () -> Unit,
+) {
+    val contexto = LocalContext.current
+    val credencialesBot = remember { CredencialesBotTelegram(contexto) }
+    val scope = rememberCoroutineScope()
+
+    ResultsScreen(
+        listas = listas,
+        errores = errores,
+        onEscanearDeNuevo = onEscanearDeNuevo,
+        onGuardarTxt = {
+            val archivo = ResultadosExportador.guardarArchivo(contexto, listas)
+            ResultadosExportador.compartirArchivo(contexto, archivo)
+        },
+        onEnviarTelegram = {
+            val token = credencialesBot.obtenerBotToken()
+            val chatId = credencialesBot.obtenerChatId()
+            if (token.isNullOrBlank() || chatId.isNullOrBlank()) {
+                Toast.makeText(contexto, "Configura el bot de Telegram en Ajustes primero.", Toast.LENGTH_LONG).show()
+            } else {
+                val archivo = ResultadosExportador.guardarArchivo(contexto, listas)
+                scope.launch {
+                    val error = TelegramBotClient.enviarArchivo(token, chatId, archivo)
+                    val mensaje = error?.let { "No se pudo enviar: $it" } ?: "Enviado a Telegram."
+                    Toast.makeText(contexto, mensaje, Toast.LENGTH_LONG).show()
+                }
+            }
+        },
+    )
 }
 
 /** Nombre a mostrar del archivo elegido en el selector del sistema (si no se puede leer, cae a null). */

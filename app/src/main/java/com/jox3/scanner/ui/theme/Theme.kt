@@ -13,6 +13,7 @@ val AcentoApp = Color(0xFF2DD4BF)
 val TextoPrimario = Color(0xFFE8EBEF)
 val TextoSecundario = Color(0xFF8A93A0)
 val ErrorApp = Color(0xFFF87171)
+val AmarilloApp = Color(0xFFFBBF24)
 
 private val EsquemaOscuro = darkColorScheme(
     primary = AcentoApp,
