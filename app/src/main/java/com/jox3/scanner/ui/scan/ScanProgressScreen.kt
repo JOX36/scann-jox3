@@ -49,6 +49,7 @@ fun ScanProgressScreen(
     registro: List<String> = emptyList(),
     inicioMs: Long = System.currentTimeMillis(),
     onDetener: (() -> Unit)? = null,
+    onCompartirRegistro: (() -> Unit)? = null,
 ) {
     // Reloj propio de la pantalla (no viene del ViewModel) solo para que
     // "validaciones/seg" se recalcule mientras el escaneo avanza, sin que
@@ -91,6 +92,13 @@ fun ScanProgressScreen(
         if (registro.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             PanelRegistro(registro)
+        }
+
+        if (onCompartirRegistro != null && (errores.isNotEmpty() || diagnostico.isNotEmpty() || registro.isNotEmpty())) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onCompartirRegistro, modifier = Modifier.fillMaxWidth()) {
+                Text("Descargar/compartir registro (.txt)")
+            }
         }
 
         if (total > 0) {

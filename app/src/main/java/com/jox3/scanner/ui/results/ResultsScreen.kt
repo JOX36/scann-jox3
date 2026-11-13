@@ -55,6 +55,7 @@ fun ResultsScreen(
     registro: List<String> = emptyList(),
     onGuardarTxt: (() -> Unit)? = null,
     onEnviarTelegram: (() -> Unit)? = null,
+    onCompartirRegistro: (() -> Unit)? = null,
 ) {
     val activas = listas.filter { it.activa }
     val latam = activas.filter { it.esLatino }
@@ -90,6 +91,13 @@ fun ResultsScreen(
         if (registro.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             PanelRegistro(registro)
+        }
+
+        if (onCompartirRegistro != null && (errores.isNotEmpty() || diagnostico.isNotEmpty() || registro.isNotEmpty())) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onCompartirRegistro, modifier = Modifier.fillMaxWidth()) {
+                Text("Descargar/compartir registro (.txt)")
+            }
         }
 
         Spacer(Modifier.height(12.dp))

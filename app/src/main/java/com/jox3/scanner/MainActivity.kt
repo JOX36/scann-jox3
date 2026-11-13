@@ -187,6 +187,7 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
 /** Pestaña "Resultados": muestra el último resultado disponible, si ya hubo un escaneo. */
 @Composable
 private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewModel) {
+    val contexto = LocalContext.current
     when (estado) {
         is EstadoFlujoEscaneo.Resultados -> {
             ResultsScreenConectada(
@@ -195,6 +196,7 @@ private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlo
                 diagnostico = estado.diagnostico,
                 registro = estado.registro,
                 onEscanearDeNuevo = viewModel::reiniciar,
+                onCompartirRegistro = { compartirRegistro(contexto, estado.errores, estado.diagnostico, estado.registro) },
             )
         }
         is EstadoFlujoEscaneo.Escaneando -> {
@@ -207,6 +209,7 @@ private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlo
                 registro = estado.registro,
                 inicioMs = estado.inicioMs,
                 onDetener = viewModel::detenerYVerParciales,
+                onCompartirRegistro = { compartirRegistro(contexto, estado.errores, estado.diagnostico, estado.registro) },
             )
         }
         else -> {
@@ -296,6 +299,7 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                 registro = s.registro,
                 inicioMs = s.inicioMs,
                 onDetener = viewModel::detenerYVerParciales,
+                onCompartirRegistro = { compartirRegistro(contexto, s.errores, s.diagnostico, s.registro) },
             )
         }
 
@@ -306,6 +310,7 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                 diagnostico = s.diagnostico,
                 registro = s.registro,
                 onEscanearDeNuevo = viewModel::reiniciar,
+                onCompartirRegistro = { compartirRegistro(contexto, s.errores, s.diagnostico, s.registro) },
             )
         }
     }
@@ -325,6 +330,7 @@ private fun ResultsScreenConectada(
     diagnostico: List<String> = emptyList(),
     registro: List<String> = emptyList(),
     onEscanearDeNuevo: () -> Unit,
+    onCompartirRegistro: (() -> Unit)? = null,
 ) {
     val contexto = LocalContext.current
     val credencialesBot = remember { CredencialesBotTelegram(contexto) }
@@ -336,6 +342,7 @@ private fun ResultsScreenConectada(
         diagnostico = diagnostico,
         registro = registro,
         onEscanearDeNuevo = onEscanearDeNuevo,
+        onCompartirRegistro = onCompartirRegistro,
         onGuardarTxt = {
             val archivo = ResultadosExportador.guardarArchivo(contexto, listas)
             ResultadosExportador.compartirArchivo(contexto, archivo)
@@ -355,6 +362,23 @@ private fun ResultsScreenConectada(
             }
         },
     )
+}
+
+/**
+ * Arma el .txt con errores + diagnóstico por chat + registro paso a paso
+ * (ver [ResultadosExportador.generarContenidoRegistro]) y abre el selector
+ * de apps del sistema para guardarlo/compartirlo — pedido explícito del
+ * usuario para poder mandar ese texto completo sin depender de una captura
+ * de pantalla que recorta el panel colapsable.
+ */
+private fun compartirRegistro(
+    contexto: Context,
+    errores: List<String>,
+    diagnostico: List<String>,
+    registro: List<String>,
+) {
+    val archivo = ResultadosExportador.guardarArchivoRegistro(contexto, errores, diagnostico, registro)
+    ResultadosExportador.compartirArchivo(contexto, archivo)
 }
 
 /** Nombre a mostrar del archivo elegido en el selector del sistema (si no se puede leer, cae a null). */

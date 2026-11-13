@@ -393,6 +393,20 @@ tener que adivinar dónde se perdió algo.
       estos últimos problemas de lectura por Temas — no un reemplazo de
       los paneles de errores/diagnóstico por chat, que siguen igual.
 
+## Etapa 11 bis: botón para descargar/compartir el registro completo
+
+El panel "Ver registro detallado" (Etapa 11) podía tener muchas líneas, más
+de las que caben en una sola captura de pantalla — hacía falta poder
+mandar el texto completo tal cual, sin recortes.
+
+- [x] Nuevo botón **"Descargar/compartir registro (.txt)"**, junto a los
+      paneles de errores/diagnóstico/registro (tanto en la pantalla de
+      escaneo como en Resultados): arma un .txt con los tres (chats con
+      error, diagnóstico por chat, y el registro paso a paso completo) y
+      abre el selector de apps del sistema para guardarlo o compartirlo
+      — mismo mecanismo que ya usaba "Guardar .txt" de los resultados
+      (reutiliza el `FileProvider` existente).
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

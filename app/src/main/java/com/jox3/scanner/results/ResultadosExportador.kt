@@ -58,6 +58,61 @@ object ResultadosExportador {
         return archivo
     }
 
+    /**
+     * Arma un .txt con el panel de errores, el diagnóstico por chat y el
+     * registro paso a paso completo (ver [com.jox3.scanner.scan.EventoEscaneo.LogPaso])
+     * tal cual se ven en la app — pedido explícito del usuario para poder
+     * mandarlos sin depender de una captura de pantalla que recorta el
+     * panel colapsable.
+     */
+    fun generarContenidoRegistro(
+        errores: List<String>,
+        diagnostico: List<String>,
+        registro: List<String>,
+    ): String {
+        val builder = StringBuilder()
+        builder.appendLine("IPTV Super Scanner — Registro del escaneo")
+        builder.appendLine("=".repeat(60))
+
+        if (errores.isNotEmpty()) {
+            builder.appendLine()
+            builder.appendLine("Chats con error (${errores.size}):")
+            errores.forEach { builder.appendLine("  • $it") }
+        }
+
+        if (diagnostico.isNotEmpty()) {
+            builder.appendLine()
+            builder.appendLine("Diagnóstico por chat:")
+            diagnostico.forEach { builder.appendLine("  • $it") }
+        }
+
+        if (registro.isNotEmpty()) {
+            builder.appendLine()
+            builder.appendLine("Registro paso a paso (${registro.size} paso(s)):")
+            registro.forEach { builder.appendLine("  $it") }
+        }
+
+        if (errores.isEmpty() && diagnostico.isEmpty() && registro.isEmpty()) {
+            builder.appendLine()
+            builder.appendLine("(Sin datos: el escaneo no llegó a leer ningún chat ni registrar ningún paso.)")
+        }
+
+        return builder.toString()
+    }
+
+    /** Igual que [guardarArchivo] pero para el registro/diagnóstico (ver [generarContenidoRegistro]). */
+    fun guardarArchivoRegistro(
+        context: Context,
+        errores: List<String>,
+        diagnostico: List<String>,
+        registro: List<String>,
+    ): File {
+        val carpeta = context.getExternalFilesDir(null) ?: context.filesDir
+        val archivo = File(carpeta, "Registro_Escaneo.txt")
+        archivo.writeText(generarContenidoRegistro(errores, diagnostico, registro))
+        return archivo
+    }
+
     /** Abre el selector de apps del sistema para guardar/compartir el .txt ya escrito. */
     fun compartirArchivo(context: Context, archivo: File) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", archivo)
