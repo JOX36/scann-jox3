@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jox3.scanner.telegram.FakeTelegramAuthClient
 import com.jox3.scanner.ui.login.LoginScreen
+import com.jox3.scanner.ui.login.LoginViewModel
 import com.jox3.scanner.ui.login.LoginViewModelFactory
 import com.jox3.scanner.ui.theme.ScannJox3Theme
 
@@ -31,7 +32,7 @@ class MainActivity : ComponentActivity() {
                     var autenticado by remember { mutableStateOf(false) }
 
                     if (!autenticado) {
-                        val viewModel = viewModel(factory = LoginViewModelFactory(authClient))
+                        val viewModel = viewModel<LoginViewModel>(factory = LoginViewModelFactory(authClient))
                         LoginScreen(viewModel = viewModel, onAutenticado = { autenticado = true })
                     } else {
                         PantallaPlaceholderInicio()
