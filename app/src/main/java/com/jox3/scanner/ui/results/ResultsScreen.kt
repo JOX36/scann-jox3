@@ -17,11 +17,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jox3.scanner.scan.engine.ListaValidada
 import com.jox3.scanner.ui.scan.FilaListaEncontrada
+import com.jox3.scanner.ui.scan.PanelErrores
 import com.jox3.scanner.ui.theme.TextoSecundario
 
 /** Pantalla "Resultados": el resumen final, igual que `print_scan_summary` del script de Python. */
 @Composable
-fun ResultsScreen(listas: List<ListaValidada>, onEscanearDeNuevo: () -> Unit) {
+fun ResultsScreen(
+    listas: List<ListaValidada>,
+    onEscanearDeNuevo: () -> Unit,
+    errores: List<String> = emptyList(),
+) {
     val activas = listas.filter { it.activa }
     val latam = activas.filter { it.esLatino }
 
@@ -33,10 +38,24 @@ fun ResultsScreen(listas: List<ListaValidada>, onEscanearDeNuevo: () -> Unit) {
             color = TextoSecundario,
             fontSize = 13.sp,
         )
+
+        if (errores.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            PanelErrores(errores)
+        }
+
         Spacer(Modifier.height(16.dp))
 
         if (listas.isEmpty()) {
-            Text("No se encontraron enlaces con este modo de búsqueda.", color = TextoSecundario, fontSize = 13.sp)
+            Text(
+                if (errores.isNotEmpty()) {
+                    "No se encontraron enlaces. Revisa los chats con error arriba: puede ser la causa real."
+                } else {
+                    "No se encontraron enlaces con este modo de búsqueda."
+                },
+                color = TextoSecundario,
+                fontSize = 13.sp,
+            )
         } else {
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(listas) { lista -> FilaListaEncontrada(lista) }

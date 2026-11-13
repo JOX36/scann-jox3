@@ -138,6 +138,48 @@ nuevo cada vez.
       este paso, el código de auto-actualización estaba listo pero nunca
       tenía nada que encontrar.
 
+## Estado actual (Etapa 7): análisis del video y 5 arreglos juntos
+
+El usuario mandó un video mostrando la app en uso y reportó 6 problemas.
+Se investigaron y se arreglaron juntos, en un solo lote:
+
+- [x] **"No muestra el 100% de mis chats, solo una parte"**: `TdChatsRepository`
+      llamaba a `GetChats` una sola vez con un límite fijo, pero TDLib solo
+      devuelve ahí los chats que ya tiene cargados en memoria. Ahora, antes de
+      pedirlos, se llama a `LoadChats` en bucle hasta que TDLib avisa (con un
+      error, su forma normal de decir "ya no hay más") que no quedan chats
+      nuevos por cargar, y solo entonces se llama a `GetChats` con un límite
+      alto (2000).
+- [x] **"No especifica si es chat, grupo o canal"**: cada chat ahora guarda su
+      [`TipoChat`] (PRIVADO/GRUPO/CANAL), calculado a partir del tipo real que
+      da TDLib (`ChatTypeSupergroup.isChannel`, `ChatTypeBasicGroup`, o
+      privado en cualquier otro caso), y se muestra como etiqueta junto al
+      nombre en las dos pantallas de selección de chats.
+- [x] **"No busca contenido en los grupos" (0 resultados)**: el motor de
+      escaneo tragaba en silencio cualquier error de TDLib al leer el
+      historial de un chat, así que un chat que fallara simplemente
+      "no encontraba nada" sin decir por qué. Ahora esos errores se capturan
+      y se muestran en un panel de aviso ("No se pudieron leer N chat(s)")
+      tanto en la pantalla de progreso como en los resultados — la próxima
+      vez que se repita el escaneo de un grupo con 0 resultados, este panel
+      dirá si es un error real de TDLib o si de verdad no había enlaces
+      (comportamiento idéntico al script de Python, que tampoco encuentra
+      nada si no hay URLs de Xtream en los mensajes).
+- [x] **"No hay un botón de ajustes para buscar actualizaciones"**: nueva
+      pantalla de **Ajustes**, con la versión instalada y un botón
+      "Buscar actualizaciones" que llama a `UpdateViewModel` a mano, sin
+      esperar a que la comprobación automática del arranque encuentre algo.
+- [x] **"No hay pestañas" / "muy pobre y sin opciones"**: la pantalla
+      principal ahora tiene barra de navegación inferior con 3 pestañas
+      (**Buscar**, **Resultados**, **Ajustes**). El `ScanFlowViewModel` y el
+      `UpdateViewModel` viven por encima del selector de pestañas, así que
+      cambiar de pestaña no reinicia el escaneo en curso ni la comprobación
+      de actualización.
+- [x] Campo de búsqueda por nombre en las dos pantallas de selección de
+      chats (`ChatsScreen`, `SeleccionarChatScreen`), para no tener que
+      desplazarse por toda la lista a mano — útil ahora que se cargan todos
+      los chats, no solo los primeros 100.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

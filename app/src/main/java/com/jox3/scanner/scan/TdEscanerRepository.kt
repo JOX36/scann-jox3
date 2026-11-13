@@ -30,7 +30,15 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         // script de Python lee los mensajes antes de validar cada enlace.
         val enlacesPorOrigen = mutableListOf<Pair<String, String>>()
         for (chat in chats) {
-            for (mensaje in obtenerMensajesRecientes(chat.id)) {
+            val mensajes = try {
+                obtenerMensajesRecientes(chat.id)
+            } catch (e: Exception) {
+                // Antes este error se tragaba en silencio y el chat
+                // simplemente "no encontraba nada" sin avisar por qué.
+                emit(EventoEscaneo.ErrorEnChat(chat.titulo, e.message ?: "error desconocido de TDLib"))
+                emptyList()
+            }
+            for (mensaje in mensajes) {
                 val texto = textoDelMensaje(mensaje)
                 if (texto.isBlank()) continue
                 extraerEnlaces(texto).forEach { enlace -> enlacesPorOrigen += chat.titulo to enlace }
@@ -61,16 +69,48 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
     /**
      * Trae un lote de los mensajes más recientes del chat (no el historial
      * completo, para no hacer el escaneo demasiado lento en chats grandes).
+     *
+     * TDLib puede devolver una página vacía o más corta de lo pedido aunque
+     * todavía NO se haya llegado al final real del historial — es
+     * comportamiento documentado, no un error (confirmado por un
+     * mantenedor de TDLib: https://github.com/tdlib/td/issues/11). Antes
+     * esta función hacía una sola llamada y se quedaba con lo que fuera que
+     * volviera; si esa primera llamada venía vacía (algo común en chats que
+     * la sesión no había leído recientemente), el chat quedaba "sin
+     * mensajes" sin ser realmente así — esto era la causa real del "0
+     * resultados, sin error, en menos de un segundo" que se reportó.
+     *
+     * Ahora se pagina pidiendo página tras página (con [fromMessageId]
+     * apuntando siempre al mensaje más viejo ya recibido) hasta juntar
+     * [limite] mensajes, y si una página vuelve vacía se reintenta unas
+     * pocas veces antes de asumir que de verdad no hay más historial.
      */
     private suspend fun obtenerMensajesRecientes(chatId: Long, limite: Int = LIMITE_MENSAJES): List<TdApi.Message> {
-        return try {
+        val mensajes = mutableListOf<TdApi.Message>()
+        var fromMessageId = 0L
+        var intentosVacios = 0
+
+        while (mensajes.size < limite && intentosVacios < MAX_INTENTOS_VACIOS) {
+            // Deja que cualquier error de TDLib se propague: quien llama
+            // decide qué hacer con él (ver [escanear], que lo convierte en
+            // un [EventoEscaneo.ErrorEnChat] visible en vez de tragárselo).
             val resultado = sesion.enviarYEsperar(
-                TdApi.GetChatHistory(chatId, 0, 0, limite, false)
+                TdApi.GetChatHistory(chatId, fromMessageId, 0, LOTE_POR_PAGINA, false)
             ) as? TdApi.Messages
-            resultado?.messages?.filterNotNull() ?: emptyList()
-        } catch (e: Exception) {
-            emptyList()
+
+            val lote = resultado?.messages?.filterNotNull().orEmpty()
+
+            if (lote.isEmpty()) {
+                intentosVacios++
+                continue
+            }
+
+            intentosVacios = 0
+            mensajes += lote
+            fromMessageId = lote.last().id
         }
+
+        return mensajes
     }
 
     /** Extrae el texto o el pie de foto/video/documento donde puede venir un enlace. */
@@ -86,5 +126,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
 
     private companion object {
         const val LIMITE_MENSAJES = 200
+        const val LOTE_POR_PAGINA = 50
+        const val MAX_INTENTOS_VACIOS = 5
     }
 }

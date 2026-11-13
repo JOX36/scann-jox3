@@ -11,19 +11,26 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jox3.scanner.scan.EstadoFlujoEscaneo
 import com.jox3.scanner.scan.ScanFlowViewModel
@@ -42,12 +49,12 @@ import com.jox3.scanner.ui.results.ResultsScreen
 import com.jox3.scanner.ui.scan.HostInputScreen
 import com.jox3.scanner.ui.scan.ModoEscaneoScreen
 import com.jox3.scanner.ui.scan.ScanProgressScreen
+import com.jox3.scanner.ui.settings.AjustesScreen
 import com.jox3.scanner.ui.setup.ApiCredentialsScreen
 import com.jox3.scanner.ui.theme.AcentoApp
 import com.jox3.scanner.ui.theme.ScannJox3Theme
 import com.jox3.scanner.BuildConfig
 import com.jox3.scanner.update.InfoActualizacion
-import com.jox3.scanner.update.UpdateBanner
 import com.jox3.scanner.update.UpdateViewModel
 
 class MainActivity : ComponentActivity() {
@@ -84,10 +91,33 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Pantallas accesibles desde las pestañas de abajo. "Buscar" cubre todo el
+ * flujo de escaneo (elegir modo → ... → progreso); cuando ese flujo llega a
+ * los resultados, también se pueden ver desde la pestaña "Resultados" sin
+ * perder el estado, porque ambas leen del mismo [ScanFlowViewModel]
+ * hospedado aquí arriba.
+ */
+private enum class Pestana(val etiqueta: String, val icono: String) {
+    BUSCAR("Buscar", "🔎"),
+    RESULTADOS("Resultados", "📋"),
+    AJUSTES("Ajustes", "⚙️"),
+}
+
 @Composable
 private fun PantallaPrincipal(authClient: TdLibAuthClient) {
+    // Ambos ViewModels se hospedan aquí, por encima del selector de
+    // pestañas, para que su estado (chats cargados, escaneo en curso,
+    // comprobación de actualizaciones) no se pierda al cambiar de pestaña.
     val updateViewModel: UpdateViewModel = viewModel()
     val estadoActualizacion by updateViewModel.estado.collectAsState()
+
+    val chatsRepository = remember { TdChatsRepository(authClient) }
+    val escanerRepository = remember { TdEscanerRepository(authClient) }
+    val scanViewModel: ScanFlowViewModel = viewModel(
+        factory = ScanFlowViewModelFactory(chatsRepository, escanerRepository),
+    )
+    val estadoEscaneo by scanViewModel.estado.collectAsState()
 
     // Launcher para volver de la pantalla de "Instalar apps desconocidas"
     // y reintentar la descarga si el usuario concedió el permiso.
@@ -103,27 +133,72 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
         updateViewModel.comprobarActualizacion(versionInstalada = BuildConfig.VERSION_NAME)
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        UpdateBanner(
-            estado = estadoActualizacion,
-            onActualizar = { info -> updateViewModel.iniciarDescarga(info) },
-            onAbrirAjustesPermiso = { info ->
-                infoPendientePermiso = info
-                lanzadorAjustesPermiso.launch(updateViewModel.intentSolicitarPermiso())
-            },
-        )
-        PantallaEscaneo(authClient)
+    var pestanaActual by remember { mutableIntStateOf(Pestana.BUSCAR.ordinal) }
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                Pestana.entries.forEachIndexed { indice, pestana ->
+                    NavigationBarItem(
+                        selected = pestanaActual == indice,
+                        onClick = { pestanaActual = indice },
+                        icon = { Text(pestana.icono) },
+                        label = { Text(pestana.etiqueta) },
+                    )
+                }
+            }
+        },
+    ) { paddingInterno ->
+        Column(modifier = Modifier.fillMaxSize().padding(paddingInterno)) {
+            when (Pestana.entries[pestanaActual]) {
+                Pestana.BUSCAR -> PantallaEscaneo(estadoEscaneo, scanViewModel)
+                Pestana.RESULTADOS -> PantallaResultadosTab(estadoEscaneo, scanViewModel)
+                Pestana.AJUSTES -> AjustesScreen(
+                    versionInstalada = BuildConfig.VERSION_NAME,
+                    estadoActualizacion = estadoActualizacion,
+                    onComprobarActualizacion = {
+                        updateViewModel.comprobarActualizacion(versionInstalada = BuildConfig.VERSION_NAME)
+                    },
+                    onActualizar = { info -> updateViewModel.iniciarDescarga(info) },
+                    onAbrirAjustesPermiso = { info ->
+                        infoPendientePermiso = info
+                        lanzadorAjustesPermiso.launch(updateViewModel.intentSolicitarPermiso())
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** Pestaña "Resultados": muestra el último resultado disponible, si ya hubo un escaneo. */
+@Composable
+private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewModel) {
+    when (estado) {
+        is EstadoFlujoEscaneo.Resultados -> {
+            ResultsScreen(listas = estado.listas, errores = estado.errores, onEscanearDeNuevo = viewModel::reiniciar)
+        }
+        is EstadoFlujoEscaneo.Escaneando -> {
+            ScanProgressScreen(
+                procesados = estado.procesados,
+                total = estado.total,
+                encontradas = estado.encontradas,
+                errores = estado.errores,
+            )
+        }
+        else -> {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text("Aún no hay resultados. Ve a la pestaña \"Buscar\" para escanear.")
+            }
+        }
     }
 }
 
 @Composable
-private fun PantallaEscaneo(authClient: TdLibAuthClient) {
-    val chatsRepository = remember { TdChatsRepository(authClient) }
-    val escanerRepository = remember { TdEscanerRepository(authClient) }
-    val viewModel: ScanFlowViewModel = viewModel(
-        factory = ScanFlowViewModelFactory(chatsRepository, escanerRepository),
-    )
-    val estado by viewModel.estado.collectAsState()
+private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewModel) {
     val contexto = LocalContext.current
 
     // Modo "Escanear un archivo .txt del dispositivo": abre el selector de
@@ -188,11 +263,16 @@ private fun PantallaEscaneo(authClient: TdLibAuthClient) {
         }
 
         is EstadoFlujoEscaneo.Escaneando -> {
-            ScanProgressScreen(procesados = s.procesados, total = s.total, encontradas = s.encontradas)
+            ScanProgressScreen(
+                procesados = s.procesados,
+                total = s.total,
+                encontradas = s.encontradas,
+                errores = s.errores,
+            )
         }
 
         is EstadoFlujoEscaneo.Resultados -> {
-            ResultsScreen(listas = s.listas, onEscanearDeNuevo = viewModel::reiniciar)
+            ResultsScreen(listas = s.listas, errores = s.errores, onEscanearDeNuevo = viewModel::reiniciar)
         }
     }
 }

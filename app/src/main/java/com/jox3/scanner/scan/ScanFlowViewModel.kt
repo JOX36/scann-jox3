@@ -45,9 +45,13 @@ sealed class EstadoFlujoEscaneo {
         val procesados: Int,
         val total: Int,
         val encontradas: List<ListaValidada>,
+        val errores: List<String> = emptyList(),
     ) : EstadoFlujoEscaneo()
 
-    data class Resultados(val listas: List<ListaValidada>) : EstadoFlujoEscaneo()
+    data class Resultados(
+        val listas: List<ListaValidada>,
+        val errores: List<String> = emptyList(),
+    ) : EstadoFlujoEscaneo()
 }
 
 class ScanFlowViewModel(
@@ -138,10 +142,11 @@ class ScanFlowViewModel(
     fun escanearArchivoLocal(nombreArchivo: String, contenido: String) {
         viewModelScope.launch {
             val encontradas = mutableListOf<ListaValidada>()
+            val errores = mutableListOf<String>()
             _estado.value = EstadoFlujoEscaneo.Escaneando(0, 0, emptyList())
 
             escanearTextoLocal(nombreArchivo, contenido).collect { evento ->
-                procesarEvento(evento, encontradas)
+                procesarEvento(evento, encontradas, errores)
             }
         }
     }
@@ -149,18 +154,28 @@ class ScanFlowViewModel(
     private fun iniciarEscaneo(chats: List<ChatTelegram>, filtroHost: String?, soloLatino: Boolean) {
         viewModelScope.launch {
             val encontradas = mutableListOf<ListaValidada>()
+            val errores = mutableListOf<String>()
             _estado.value = EstadoFlujoEscaneo.Escaneando(0, 0, emptyList())
 
             escanerRepository.escanear(chats, filtroHost, soloLatino).collect { evento ->
-                procesarEvento(evento, encontradas)
+                procesarEvento(evento, encontradas, errores)
             }
         }
     }
 
-    private fun procesarEvento(evento: EventoEscaneo, encontradas: MutableList<ListaValidada>) {
+    private fun procesarEvento(
+        evento: EventoEscaneo,
+        encontradas: MutableList<ListaValidada>,
+        errores: MutableList<String>,
+    ) {
         when (evento) {
             is EventoEscaneo.Progreso -> {
-                _estado.value = EstadoFlujoEscaneo.Escaneando(evento.procesados, evento.total, encontradas.toList())
+                _estado.value = EstadoFlujoEscaneo.Escaneando(
+                    evento.procesados,
+                    evento.total,
+                    encontradas.toList(),
+                    errores.toList(),
+                )
             }
             is EventoEscaneo.ListaEncontrada -> {
                 encontradas += evento.lista
@@ -169,8 +184,15 @@ class ScanFlowViewModel(
                     _estado.value = estadoActual.copy(encontradas = encontradas.toList())
                 }
             }
+            is EventoEscaneo.ErrorEnChat -> {
+                errores += "${evento.chatTitulo}: ${evento.mensaje}"
+                val estadoActual = _estado.value
+                if (estadoActual is EstadoFlujoEscaneo.Escaneando) {
+                    _estado.value = estadoActual.copy(errores = errores.toList())
+                }
+            }
             EventoEscaneo.Finalizado -> {
-                _estado.value = EstadoFlujoEscaneo.Resultados(encontradas.toList())
+                _estado.value = EstadoFlujoEscaneo.Resultados(encontradas.toList(), errores.toList())
             }
         }
     }
