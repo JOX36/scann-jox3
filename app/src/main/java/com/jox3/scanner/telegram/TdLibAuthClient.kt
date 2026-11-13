@@ -112,7 +112,6 @@ class TdLibAuthClient(
             deviceModel = Build.MODEL ?: "Android"
             systemVersion = Build.VERSION.RELEASE ?: "unknown"
             applicationVersion = "0.1.0"
-            enableStorageOptimizer = true
         }
         cliente?.send(parametros) { resultado -> manejarPosibleError(resultado) }
     }
