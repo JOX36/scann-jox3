@@ -132,7 +132,24 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
      */
     private suspend fun obtenerMensajesRecientes(chatId: Long, limite: Int = LIMITE_MENSAJES): List<TdApi.Message> {
         if (esChatConTemas(chatId)) {
-            return obtenerMensajesDeForo(chatId, limite)
+            // Si la lectura por temas no trae NADA — ya sea porque
+            // GetForumTopics/GetForumTopicHistory no respondieron a tiempo
+            // (visto en la práctica incluso con GetForumTopics, la llamada
+            // más liviana de las dos) o porque de verdad no había mensajes
+            // en ningún tema — se cae al historial normal como último
+            // recurso en vez de devolver "0 mensajes" directo. En un foro
+            // de verdad esto trae al menos el tema "General"; y si
+            // [esChatConTemas] se equivocó con este chat puntual (no es
+            // realmente un foro), esto es lo que debía leerse desde el
+            // principio.
+            val mensajesDeForo = try {
+                obtenerMensajesDeForo(chatId, limite)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                emptyList()
+            }
+            if (mensajesDeForo.isNotEmpty()) return mensajesDeForo
         }
         return obtenerMensajesDeHistorialNormal(chatId, limite)
     }

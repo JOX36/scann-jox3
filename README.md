@@ -357,6 +357,23 @@ chat leído con éxito: `<chat>: N mensajes leídos, M enlace(s) candidato(s)`.
   el problema está en la validación contra el panel (caído, credenciales
   vencidas, etc.), no en la lectura de Telegram.
 
+## Etapa 10 quinquies: respaldo al historial normal si la lectura por Temas no trae nada
+
+Con el diagnóstico de la Etapa 10 quater se confirmó que, para un chat
+puntual, ni siquiera `GetForumTopics` (la llamada más liviana de la lectura
+por Temas, solo para listar los temas) llegaba a responder — no era ya un
+caso de `GetForumTopicHistory` tardándose por un `FLOOD_WAIT` puntual, sino
+algo más estructural con ese chat específico.
+
+- [x] En vez de seguir ajustando timeouts a ciegas, `obtenerMensajesRecientes`
+      ahora tiene un último recurso: si la lectura por Temas no trae NINGÚN
+      mensaje (falle en `GetForumTopics`, en algún `GetForumTopicHistory`, o
+      de verdad no haya nada en ningún tema), se cae al historial normal
+      (`GetChatHistory`) antes de rendirse. En un foro de verdad eso trae
+      al menos los mensajes del tema "General"; y si la detección de
+      "¿tiene Temas?" se equivocó con ese chat puntual (no era realmente un
+      foro), esto es lo que debía leerse desde un principio.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
