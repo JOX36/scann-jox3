@@ -201,8 +201,13 @@ object XtreamClient {
     /** Cantidad de series del panel — equivalente a `series` en Python. */
     suspend fun obtenerCantidadSeries(cred: CredencialesXtream): Int? = contarStream(cred, "get_series")
 
-    /** Tope de espera para la resolución DNS — no debe bloquear el resto del escaneo si el DNS está lento o caído. */
-    private const val TIMEOUT_DNS_MS = 4_000L
+    // Con muchos enlaces validándose a la vez (hasta MAX_VALIDACIONES_EN_PARALELO
+    // en ValidadorListas), cada uno ya dispara varias peticiones de red en
+    // paralelo (categorías, canales, películas, series, IP); bajo esa carga
+    // la resolución DNS puede tardar en arrancar no porque el DNS esté
+    // lento, sino porque el hilo/conexión que la hace está ocupado con
+    // otra cosa. 4s alcanzaba a cortarla antes de que arrancara de verdad.
+    private const val TIMEOUT_DNS_MS = 12_000L
 
     /**
      * Resuelve la IP real del servidor detrás del host de la lista (pedido
