@@ -39,6 +39,23 @@ La actualización es siempre semi-automática, igual que en iptv-exo: la app
 avisa y descarga, pero el usuario confirma la instalación en la pantalla
 estándar de Android — nunca se instala nada en silencio.
 
+## Estado actual (Etapa 3)
+
+- [x] Motor de validación de listas, portado del script de Python:
+      extracción de credenciales Xtream desde un enlace, verificación de
+      cuenta (`player_api.php`), y detección de contenido latino por
+      categorías + nombres de canal como respaldo (mismas palabras clave y
+      umbral de 12% que el script)
+- [x] Pantallas de selección de chats, progreso de escaneo en vivo y
+      resultados finales (activas / LATAM), con el mismo tema visual de la
+      vista previa de diseño
+- [ ] **Lectura real de mensajes de Telegram** — por ahora `ChatsRepository`
+      y `EscanerRepository` tienen implementaciones de prueba
+      (`FakeChatsRepository`, `FakeEscanerRepository`) con chats y mensajes
+      de ejemplo (incluye un enlace real para poder probar el motor de
+      validación contra un panel de verdad). Se reemplazan por
+      implementaciones con TDLib sin tocar las pantallas ni el motor.
+
 ## Por qué TDLib queda pendiente como paso aparte
 
 TDLib es la librería oficial de Telegram para actuar como una cuenta de
