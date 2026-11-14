@@ -515,6 +515,40 @@ real reportado con captura de pantalla:
       equivocada) y el enlace M3U armado con la IP alternativa en vez
       del dominio, cuando esa IP ya se había resuelto.
 
+## Etapa 15: diseño visual "Glass HUD" aplicado a las pantallas reales
+
+El usuario eligió la opción "Glass HUD" entre los 3 previews de diseño
+futurista (Neon Grid / Glass HUD / Aurora Terminal) armados en la Etapa
+14; esta etapa la aplica a las pantallas reales de la app, no solo a la
+maqueta de muestra.
+
+- [x] Paleta nueva en `ui/theme/Theme.kt`: fondo casi negro con tinte
+      verdoso (`#07100F`), acento esmeralda (`#2EE6A8`) + turquesa
+      (`#22B8CF`) para los degradados, tarjetas "de vidrio" (fondo
+      blanco al ~8%, `SuperficieApp`) con borde sutil (`BordeApp`,
+      blanco al ~9%) en vez del gris plano de antes.
+- [x] Fondo de toda la app (`ui/common/FondoConGlow.kt`, nuevo): dos
+      manchas de luz difuminadas detrás de las pantallas, igual que en
+      el preview — el difuminado real solo se nota en Android 12+, en
+      versiones anteriores el degradado se ve sin difuminar, sin que
+      eso rompa nada (es el comportamiento documentado de
+      `Modifier.blur` en versiones viejas).
+- [x] Pantalla "¿Cómo quieres buscar?" con chips de ícono: la primera
+      opción ("Cualquier lista") con el degradado esmeralda→turquesa
+      destacado, igual que el preview elegido; el resto con un chip
+      más neutro.
+- [x] Tarjetas de chats, resultados, paneles de diagnóstico/registro y
+      el detalle por lista (de la Etapa 14) con el mismo tratamiento
+      "de vidrio": borde sutil + esquinas más redondeadas (16-20dp en
+      vez de 12dp).
+- [x] Barra inferior de navegación y botón "Volver" con el acento
+      esmeralda en vez del turquesa plano de antes.
+- [ ] Pantallas de login y de credenciales de la API de Telegram (poco
+      vistas, solo al configurar la app por primera vez) quedan con los
+      componentes estándar de Material3 por ahora — ya se ven con la
+      paleta oscura nueva del tema, pero no tienen el tratamiento "de
+      vidrio" con borde.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

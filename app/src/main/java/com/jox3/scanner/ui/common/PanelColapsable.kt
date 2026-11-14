@@ -1,5 +1,6 @@
 package com.jox3.scanner.ui.common
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jox3.scanner.ui.theme.BordeApp
 import com.jox3.scanner.ui.theme.SuperficieApp
 import com.jox3.scanner.ui.theme.TextoPrimario
 import com.jox3.scanner.ui.theme.TextoSecundario
@@ -40,7 +42,8 @@ fun PanelColapsable(titulo: String, items: List<String>, empiezaExpandido: Boole
 
     Surface(
         color = SuperficieApp,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, BordeApp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {

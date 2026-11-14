@@ -1,5 +1,6 @@
 package com.jox3.scanner.ui.scan
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jox3.scanner.scan.engine.ListaValidada
 import com.jox3.scanner.ui.theme.AcentoApp
+import com.jox3.scanner.ui.theme.BordeApp
 import com.jox3.scanner.ui.theme.ErrorApp
 import com.jox3.scanner.ui.theme.SuperficieApp
 import com.jox3.scanner.ui.theme.TextoPrimario
@@ -63,7 +65,7 @@ fun ScanProgressScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-        Text("Escaneando...", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text("Escaneando...", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
         Spacer(Modifier.height(8.dp))
 
         val progreso = if (total > 0) procesados.toFloat() / total else 0f
@@ -140,7 +142,7 @@ fun ScanProgressScreen(
 
 @Composable
 private fun EstadisticaCelda(etiqueta: String, valor: String, colorValor: Color, modifier: Modifier = Modifier) {
-    Surface(color = SuperficieApp, shape = RoundedCornerShape(12.dp), modifier = modifier) {
+    Surface(color = SuperficieApp, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, BordeApp), modifier = modifier) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             Text(etiqueta, color = TextoSecundario, fontSize = 11.sp)
             Text(valor, color = colorValor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -153,7 +155,8 @@ private fun EstadisticaCelda(etiqueta: String, valor: String, colorValor: Color,
 internal fun PanelErrores(errores: List<String>) {
     Surface(
         color = SuperficieApp,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, BordeApp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
@@ -183,7 +186,8 @@ internal fun PanelErrores(errores: List<String>) {
 internal fun PanelDiagnostico(diagnostico: List<String>) {
     Surface(
         color = SuperficieApp,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, BordeApp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
@@ -215,7 +219,8 @@ internal fun PanelRegistro(registro: List<String>) {
 
     Surface(
         color = SuperficieApp,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, BordeApp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
@@ -248,13 +253,14 @@ internal fun PanelRegistro(registro: List<String>) {
 internal fun FilaListaEncontrada(lista: ListaValidada) {
     Surface(
         color = SuperficieApp,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, BordeApp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            Text(lista.credenciales.host, fontSize = 14.sp)
+            Text(lista.credenciales.host, fontSize = 14.sp, color = TextoPrimario)
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val color = if (!lista.activa) ErrorApp else if (lista.esLatino) AcentoApp else TextoSecundario

@@ -1,5 +1,6 @@
 package com.jox3.scanner.ui.chats
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,7 +31,9 @@ import com.jox3.scanner.scan.data.ChatTelegram
 import com.jox3.scanner.scan.data.TipoChat
 import com.jox3.scanner.ui.common.BarraVolver
 import com.jox3.scanner.ui.common.FiltroTipoChatChips
+import com.jox3.scanner.ui.theme.BordeApp
 import com.jox3.scanner.ui.theme.SuperficieApp
+import com.jox3.scanner.ui.theme.TextoPrimario
 import com.jox3.scanner.ui.theme.TextoSecundario
 
 /** Pantalla "Chats": elegir en qué chats buscar listas antes de escanear. */
@@ -50,7 +53,7 @@ fun ChatsScreen(
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
         BarraVolver(onVolver)
-        Text("Elige los chats a escanear", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text("Elige los chats a escanear", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
         Spacer2()
         Text(
             "Se buscarán listas M3U/Xtream en los mensajes de los chats marcados.",
@@ -93,7 +96,8 @@ fun ChatsScreen(
 private fun FilaChat(chat: ChatTelegram, marcado: Boolean, onClick: () -> Unit) {
     Surface(
         color = SuperficieApp,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, BordeApp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
@@ -101,7 +105,7 @@ private fun FilaChat(chat: ChatTelegram, marcado: Boolean, onClick: () -> Unit) 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {

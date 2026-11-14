@@ -1,5 +1,6 @@
 package com.jox3.scanner.ui.common
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -11,8 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jox3.scanner.ui.theme.AcentoApp
+import com.jox3.scanner.ui.theme.BordeApp
 import com.jox3.scanner.ui.theme.SuperficieApp
-import com.jox3.scanner.ui.theme.TextoPrimario
 
 /**
  * Botón "← Volver" para las pantallas intermedias del flujo de escaneo
@@ -25,17 +27,18 @@ import com.jox3.scanner.ui.theme.TextoPrimario
 fun BarraVolver(onVolver: () -> Unit) {
     Surface(
         color = SuperficieApp,
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(50),
+        border = BorderStroke(1.dp, BordeApp),
         onClick = onVolver,
         modifier = Modifier.padding(bottom = 14.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
         ) {
-            Text("←", fontSize = 15.sp, color = TextoPrimario)
-            Text("Volver", fontSize = 13.sp, color = TextoPrimario)
+            Text("←", fontSize = 15.sp, color = AcentoApp)
+            Text("Volver", fontSize = 13.sp, color = AcentoApp)
         }
     }
 }

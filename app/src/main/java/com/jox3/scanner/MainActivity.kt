@@ -9,6 +9,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,8 +19,8 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -43,6 +46,7 @@ import com.jox3.scanner.scan.TdEscanerRepository
 import com.jox3.scanner.scan.TipoModo
 import com.jox3.scanner.scan.engine.DetalleLista
 import com.jox3.scanner.scan.engine.ListaValidada
+import com.jox3.scanner.ui.common.FondoConGlow
 import com.jox3.scanner.ui.results.DetalleListaScreen
 import com.jox3.scanner.telegram.CredencialesApiTelegram
 import com.jox3.scanner.telegram.CredencialesBotTelegram
@@ -60,7 +64,11 @@ import com.jox3.scanner.ui.scan.ScanProgressScreen
 import com.jox3.scanner.ui.settings.AjustesScreen
 import com.jox3.scanner.ui.setup.ApiCredentialsScreen
 import com.jox3.scanner.ui.theme.AcentoApp
+import com.jox3.scanner.ui.theme.AcentoSuaveApp
+import com.jox3.scanner.ui.theme.BordeApp
 import com.jox3.scanner.ui.theme.ScannJox3Theme
+import com.jox3.scanner.ui.theme.SuperficieFuerteApp
+import com.jox3.scanner.ui.theme.TextoTerciarioApp
 import com.jox3.scanner.BuildConfig
 import com.jox3.scanner.update.InfoActualizacion
 import com.jox3.scanner.update.UpdateViewModel
@@ -72,7 +80,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             ScannJox3Theme {
-                Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+                FondoConGlow(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
                     val credenciales = remember { CredencialesApiTelegram(applicationContext) }
                     var credencialesListas by remember { mutableStateOf(credenciales.tieneCredenciales()) }
 
@@ -145,14 +153,26 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
     var pestanaActual by remember { mutableIntStateOf(Pestana.BUSCAR.ordinal) }
 
     Scaffold(
+        containerColor = Color.Transparent,
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = SuperficieFuerteApp,
+                contentColor = TextoTerciarioApp,
+                modifier = Modifier.border(BorderStroke(1.dp, BordeApp)).padding(top = 1.dp),
+            ) {
                 Pestana.entries.forEachIndexed { indice, pestana ->
                     NavigationBarItem(
                         selected = pestanaActual == indice,
                         onClick = { pestanaActual = indice },
                         icon = { Text(pestana.icono) },
                         label = { Text(pestana.etiqueta) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = AcentoApp,
+                            selectedTextColor = AcentoApp,
+                            indicatorColor = AcentoSuaveApp,
+                            unselectedIconColor = TextoTerciarioApp,
+                            unselectedTextColor = TextoTerciarioApp,
+                        ),
                     )
                 }
             }

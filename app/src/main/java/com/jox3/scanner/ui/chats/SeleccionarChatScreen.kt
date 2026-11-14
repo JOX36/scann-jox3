@@ -1,5 +1,6 @@
 package com.jox3.scanner.ui.chats
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,7 +26,9 @@ import com.jox3.scanner.scan.data.ChatTelegram
 import com.jox3.scanner.scan.data.TipoChat
 import com.jox3.scanner.ui.common.BarraVolver
 import com.jox3.scanner.ui.common.FiltroTipoChatChips
+import com.jox3.scanner.ui.theme.BordeApp
 import com.jox3.scanner.ui.theme.SuperficieApp
+import com.jox3.scanner.ui.theme.TextoPrimario
 
 /** Pantalla para elegir un único chat (modos "...en un chat específico"). */
 @Composable
@@ -38,7 +41,7 @@ fun SeleccionarChatScreen(chats: List<ChatTelegram>, onChatElegido: (ChatTelegra
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
         BarraVolver(onVolver)
-        Text("Elige un chat", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text("Elige un chat", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
             value = busqueda,
@@ -54,7 +57,8 @@ fun SeleccionarChatScreen(chats: List<ChatTelegram>, onChatElegido: (ChatTelegra
             items(chatsFiltrados, key = { it.id }) { chat ->
                 Surface(
                     color = SuperficieApp,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, BordeApp),
                     onClick = { onChatElegido(chat) },
                     modifier = Modifier
                         .fillMaxWidth()

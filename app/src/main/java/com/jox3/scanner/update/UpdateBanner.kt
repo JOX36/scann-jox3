@@ -1,5 +1,6 @@
 package com.jox3.scanner.update
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jox3.scanner.ui.theme.AcentoApp
+import com.jox3.scanner.ui.theme.BordeApp
 import com.jox3.scanner.ui.theme.SuperficieApp
 import com.jox3.scanner.ui.theme.TextoSecundario
 
@@ -74,7 +76,8 @@ fun UpdateBanner(
 private fun BannerBase(contenido: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
     Surface(
         color = SuperficieApp,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, BordeApp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),

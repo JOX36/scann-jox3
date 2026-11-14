@@ -1,5 +1,6 @@
 package com.jox3.scanner.ui.results
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +29,7 @@ import com.jox3.scanner.scan.engine.XtreamClient
 import com.jox3.scanner.ui.common.BarraVolver
 import com.jox3.scanner.ui.common.PanelColapsable
 import com.jox3.scanner.ui.theme.AcentoApp
+import com.jox3.scanner.ui.theme.BordeApp
 import com.jox3.scanner.ui.theme.SuperficieApp
 import com.jox3.scanner.ui.theme.TextoPrimario
 import com.jox3.scanner.ui.theme.TextoSecundario
@@ -62,7 +64,7 @@ fun DetalleListaScreen(
             .padding(20.dp),
     ) {
         BarraVolver(onVolver)
-        Text(cred.host, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text(cred.host, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
         Spacer(Modifier.height(4.dp))
         Text("Encontrada en: ${lista.origenChat}", color = TextoSecundario, fontSize = 12.sp)
         Spacer(Modifier.height(16.dp))
@@ -101,7 +103,12 @@ fun DetalleListaScreen(
                 if (detalle.geoIp != null) {
                     val bandera = XtreamClient.banderaDesdeCodigoPais(detalle.geoIp.codigoPais)
                     val lugar = listOfNotNull(detalle.geoIp.ciudad, detalle.geoIp.pais).joinToString(", ")
-                    Surface(color = SuperficieApp, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Surface(
+                        color = SuperficieApp,
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, BordeApp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text("📍 Servidor real", color = TextoPrimario, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(4.dp))

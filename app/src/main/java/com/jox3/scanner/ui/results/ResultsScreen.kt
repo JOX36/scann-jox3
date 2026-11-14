@@ -1,5 +1,6 @@
 package com.jox3.scanner.ui.results
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,7 +32,9 @@ import com.jox3.scanner.ui.scan.PanelErrores
 import com.jox3.scanner.ui.scan.PanelRegistro
 import com.jox3.scanner.ui.theme.AcentoApp
 import com.jox3.scanner.ui.theme.AmarilloApp
+import com.jox3.scanner.ui.theme.BordeApp
 import com.jox3.scanner.ui.theme.ErrorApp
+import com.jox3.scanner.ui.theme.OnAcentoApp
 import com.jox3.scanner.ui.theme.SuperficieApp
 import com.jox3.scanner.ui.theme.TextoPrimario
 import com.jox3.scanner.ui.theme.TextoSecundario
@@ -70,7 +73,7 @@ fun ResultsScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-        Text("Resultados", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text("Resultados", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
         Spacer(Modifier.height(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -151,7 +154,7 @@ fun ResultsScreen(
 
 @Composable
 private fun EstadisticaChip(etiqueta: String, valor: String, colorValor: Color, modifier: Modifier = Modifier) {
-    Surface(color = SuperficieApp, shape = RoundedCornerShape(12.dp), modifier = modifier) {
+    Surface(color = SuperficieApp, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, BordeApp), modifier = modifier) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             Text(valor, color = colorValor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(etiqueta, color = TextoSecundario, fontSize = 11.sp)
@@ -164,11 +167,12 @@ private fun FiltroChip(etiqueta: String, seleccionado: Boolean, onClick: () -> U
     Surface(
         color = if (seleccionado) AcentoApp else SuperficieApp,
         shape = RoundedCornerShape(50),
+        border = if (seleccionado) null else BorderStroke(1.dp, BordeApp),
         onClick = onClick,
     ) {
         Text(
             etiqueta,
-            color = if (seleccionado) Color(0xFF06231F) else TextoSecundario,
+            color = if (seleccionado) OnAcentoApp else TextoSecundario,
             fontSize = 13.sp,
             fontWeight = if (seleccionado) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -187,16 +191,17 @@ private fun FiltroChip(etiqueta: String, seleccionado: Boolean, onClick: () -> U
 internal fun FilaResultado(lista: ListaValidada, onClick: (() -> Unit)? = null) {
     Surface(
         color = SuperficieApp,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, BordeApp),
         onClick = onClick ?: {},
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(lista.credenciales.host, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text(lista.credenciales.host, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
                 InsigniaVencimiento(lista.diasRestantes)
             }
             Spacer(Modifier.height(6.dp))
