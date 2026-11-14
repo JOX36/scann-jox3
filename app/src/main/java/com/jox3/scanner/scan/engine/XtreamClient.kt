@@ -65,6 +65,22 @@ private data class Categoria(val category_name: String? = null)
 @Serializable
 private data class CanalLive(val name: String? = null)
 
+/** `get_vod_streams`/`get_series` traen más campos, pero acá solo hace falta el nombre. */
+@Serializable
+private data class StreamConNombre(val name: String? = null)
+
+@Serializable
+private data class RespuestaGeoIp(
+    val city: String? = null,
+    val country_name: String? = null,
+    val country: String? = null,
+    val org: String? = null,
+    val error: Boolean? = null,
+)
+
+/** Geolocalización aproximada de una IP — ver [XtreamClient.geolocalizarIp]. */
+data class InfoGeoIp(val ciudad: String?, val pais: String?, val codigoPais: String?, val isp: String?)
+
 /**
  * Info de cuenta ya interpretada (fechas, conexiones) — equivalente al
  * diccionario que arma `validate_m3u_url` en el script de Python.
@@ -81,6 +97,8 @@ data class InfoCuentaXtream(
     val fechaVencimiento: String? = null,
     val fechaCreacion: String? = null,
     val formatos: String? = null,
+    /** Texto crudo del panel ("Active"), tal cual lo manda — para mostrarlo igual que el formato de referencia del usuario. */
+    val estadoTexto: String? = null,
 )
 
 /**
@@ -133,6 +151,7 @@ object XtreamClient {
                 fechaCreacion = info.created_at.comoFechaUtc(),
                 formatos = info.allowed_output_formats?.takeIf { it.isNotEmpty() }
                     ?.joinToString(", ") { it.lowercase() },
+                estadoTexto = info.status,
             )
         }.getOrNull()
     }
@@ -201,6 +220,30 @@ object XtreamClient {
     /** Cantidad de series del panel — equivalente a `series` en Python. */
     suspend fun obtenerCantidadSeries(cred: CredencialesXtream): Int? = contarStream(cred, "get_series")
 
+    private suspend fun obtenerNombresStream(cred: CredencialesXtream, accion: String): List<String> {
+        return runCatching {
+            val elementos: List<StreamConNombre> = NetworkModule.cliente.get(urlPlayerApi(cred)) {
+                parameter("username", cred.username)
+                parameter("password", cred.password)
+                parameter("action", accion)
+            }.body()
+            elementos.mapNotNull { it.name }
+        }.getOrDefault(emptyList())
+    }
+
+    /**
+     * Nombres completos de películas/series del panel — a diferencia de
+     * [obtenerCantidadPeliculas]/[obtenerCantidadSeries] (que solo cuentan),
+     * estas sí traen la lista completa. Pedido explícito del usuario: poder
+     * ver el detalle de una lista (qué tiene) sin ir a Telegram. Se llaman
+     * solo cuando el usuario abre el detalle de ESA lista puntual — pedirlas
+     * para las cientos de listas de un escaneo masivo sería mucho más
+     * tráfico del necesario para algo que la mayoría de las veces no se va
+     * a mirar.
+     */
+    suspend fun obtenerNombresPeliculas(cred: CredencialesXtream): List<String> = obtenerNombresStream(cred, "get_vod_streams")
+    suspend fun obtenerNombresSeries(cred: CredencialesXtream): List<String> = obtenerNombresStream(cred, "get_series")
+
     // Con muchos enlaces validándose a la vez (hasta MAX_VALIDACIONES_EN_PARALELO
     // en ValidadorListas), cada uno ya dispara varias peticiones de red en
     // paralelo (categorías, canales, películas, series, IP); bajo esa carga
@@ -247,4 +290,110 @@ object XtreamClient {
      * ser un caso prácticamente inexistente en paneles Xtream.)
      */
     private fun esDireccionIpLiteral(host: String): Boolean = patronIpv4.matches(host)
+
+    /**
+     * La IP a geolocalizar/mostrar para esta lista: la ya resuelta por DNS
+     * si el host era un dominio ([direccionIpResuelta], de
+     * [ValidadorListas]), o el host mismo si YA era una IP literal. `null`
+     * solo si no hay ninguna IP disponible (dominio que no se pudo resolver).
+     */
+    fun ipEfectiva(cred: CredencialesXtream, direccionIpResuelta: String?): String? {
+        if (direccionIpResuelta != null) return direccionIpResuelta
+        val sinEsquema = cred.host.substringAfter("://").substringBefore("/").substringBefore(":")
+        return sinEsquema.takeIf { esDireccionIpLiteral(it) }
+    }
+
+    /**
+     * El mismo enlace M3U pero con el host cambiado por [ip] — pedido
+     * explícito del usuario ("quisiera... incluir la dirección IP como
+     * alternativa"): una lista que se encontró por dominio puede a veces
+     * reproducirse igual pegándole directo a la IP del servidor, sin pasar
+     * por el DNS. Pura edición de texto, sin red: cambia solo el
+     * host/puerto al principio de [CredencialesXtream.urlOriginal] y deja
+     * el resto (ruta, usuario, contraseña) intacto.
+     */
+    fun enlacePorIp(cred: CredencialesXtream, ip: String): String {
+        val sinEsquema = cred.host.substringAfter("://")
+        val puerto = sinEsquema.substringAfter(":", "")
+        val hostConIp = if (puerto.isNotEmpty()) "$ip:$puerto" else ip
+        val prefijoNuevo = "${cred.host.substringBefore("://")}://$hostConIp"
+        return cred.urlOriginal.replaceFirst(cred.host, prefijoNuevo)
+    }
+
+    /**
+     * Geolocalización aproximada del servidor por IP (ciudad, país, ISP) —
+     * pedido explícito del usuario: "no sé cuál es el servidor real".
+     * Usa ipapi.co (gratis, HTTPS, sin API key) — solo para la IP de la
+     * lista que el usuario abrió, nunca durante el escaneo masivo, para no
+     * sumarle una consulta externa más a cada uno de cientos de enlaces.
+     * Se traga cualquier error (límite de la API gratis, IP no encontrada,
+     * sin red) y devuelve `null` en vez de romper el detalle completo por
+     * un dato que es "extra", no esencial.
+     */
+    suspend fun geolocalizarIp(ip: String): InfoGeoIp? {
+        return runCatching {
+            val respuesta: RespuestaGeoIp = NetworkModule.cliente.get("https://ipapi.co/$ip/json/").body()
+            if (respuesta.error == true) return@runCatching null
+            InfoGeoIp(
+                ciudad = respuesta.city,
+                pais = respuesta.country_name,
+                codigoPais = respuesta.country,
+                isp = respuesta.org,
+            )
+        }.getOrNull()
+    }
+
+    /**
+     * Código ISO-3166 de 2 letras ("CL") → su emoji de bandera, con el
+     * truco estándar de "regional indicator symbols" (cada letra A-Z tiene
+     * un símbolo Unicode paralelo que, de a dos, el sistema dibuja como
+     * bandera) — funciona para cualquier país sin necesitar una tabla fija.
+     */
+    fun banderaDesdeCodigoPais(codigo: String?): String {
+        if (codigo == null || codigo.length != 2) return ""
+        val base = 0x1F1E6
+        val letras = codigo.uppercase()
+        if (letras.any { it !in 'A'..'Z' }) return ""
+        return letras.map { String(Character.toChars(base + (it - 'A'))) }.joinToString("")
+    }
+
+    /**
+     * Mapa de zona horaria → código de país, a mano y NO exhaustivo (solo
+     * Latinoamérica y un puñado de zonas comunes): IANA no guarda el país
+     * de cada zona, así que esto es lo más parecido a una bandera para el
+     * campo "Timezone" sin inventar una que no se pueda sostener. Si la
+     * zona no está en esta lista, [banderaDesdeTimezone] no muestra nada
+     * en vez de arriesgar una bandera equivocada.
+     */
+    private val PAIS_POR_TIMEZONE: Map<String, String> = mapOf(
+        "America/Bogota" to "CO",
+        "America/Mexico_City" to "MX",
+        "America/Santiago" to "CL",
+        "America/Lima" to "PE",
+        "America/Argentina/Buenos_Aires" to "AR",
+        "America/Caracas" to "VE",
+        "America/La_Paz" to "BO",
+        "America/Guatemala" to "GT",
+        "America/Tegucigalpa" to "HN",
+        "America/Managua" to "NI",
+        "America/Panama" to "PA",
+        "America/Santo_Domingo" to "DO",
+        "America/Asuncion" to "PY",
+        "America/Montevideo" to "UY",
+        "America/El_Salvador" to "SV",
+        "America/Costa_Rica" to "CR",
+        "America/Puerto_Rico" to "PR",
+        "America/New_York" to "US",
+        "America/Chicago" to "US",
+        "America/Denver" to "US",
+        "America/Los_Angeles" to "US",
+        "America/Toronto" to "CA",
+        "America/Sao_Paulo" to "BR",
+        "Europe/Madrid" to "ES",
+        "Europe/Lisbon" to "PT",
+        "Europe/London" to "GB",
+    )
+
+    fun banderaDesdeTimezone(zona: String?): String =
+        banderaDesdeCodigoPais(zona?.let { PAIS_POR_TIMEZONE[it] })
 }

@@ -41,7 +41,9 @@ import com.jox3.scanner.scan.ScanFlowViewModelFactory
 import com.jox3.scanner.scan.TdChatsRepository
 import com.jox3.scanner.scan.TdEscanerRepository
 import com.jox3.scanner.scan.TipoModo
+import com.jox3.scanner.scan.engine.DetalleLista
 import com.jox3.scanner.scan.engine.ListaValidada
+import com.jox3.scanner.ui.results.DetalleListaScreen
 import com.jox3.scanner.telegram.CredencialesApiTelegram
 import com.jox3.scanner.telegram.CredencialesBotTelegram
 import com.jox3.scanner.telegram.TdLibAuthClient
@@ -188,16 +190,31 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
 @Composable
 private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewModel) {
     val contexto = LocalContext.current
+    val listaDetalle by viewModel.listaDetalle.collectAsState()
     when (estado) {
         is EstadoFlujoEscaneo.Resultados -> {
-            ResultsScreenConectada(
-                listas = estado.listas,
-                errores = estado.errores,
-                diagnostico = estado.diagnostico,
-                registro = estado.registro,
-                onEscanearDeNuevo = viewModel::reiniciar,
-                onCompartirRegistro = { compartirRegistro(contexto, estado.errores, estado.diagnostico, estado.registro) },
-            )
+            val listaElegida = listaDetalle
+            if (listaElegida != null) {
+                val detalleInfo by viewModel.detalleInfo.collectAsState()
+                val detalleCargando by viewModel.detalleCargando.collectAsState()
+                DetalleListaConectada(
+                    lista = listaElegida,
+                    detalle = detalleInfo,
+                    cargando = detalleCargando,
+                    onVolver = viewModel::cerrarDetalle,
+                    onConsultar = viewModel::consultarDetalle,
+                )
+            } else {
+                ResultsScreenConectada(
+                    listas = estado.listas,
+                    errores = estado.errores,
+                    diagnostico = estado.diagnostico,
+                    registro = estado.registro,
+                    onEscanearDeNuevo = viewModel::reiniciar,
+                    onCompartirRegistro = { compartirRegistro(contexto, estado.errores, estado.diagnostico, estado.registro) },
+                    onListaElegida = viewModel::abrirDetalle,
+                )
+            }
         }
         is EstadoFlujoEscaneo.Escaneando -> {
             ScanProgressScreen(
@@ -305,14 +322,29 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
         }
 
         is EstadoFlujoEscaneo.Resultados -> {
-            ResultsScreenConectada(
-                listas = s.listas,
-                errores = s.errores,
-                diagnostico = s.diagnostico,
-                registro = s.registro,
-                onEscanearDeNuevo = viewModel::reiniciar,
-                onCompartirRegistro = { compartirRegistro(contexto, s.errores, s.diagnostico, s.registro) },
-            )
+            val listaDetalle by viewModel.listaDetalle.collectAsState()
+            val listaElegida = listaDetalle
+            if (listaElegida != null) {
+                val detalleInfo by viewModel.detalleInfo.collectAsState()
+                val detalleCargando by viewModel.detalleCargando.collectAsState()
+                DetalleListaConectada(
+                    lista = listaElegida,
+                    detalle = detalleInfo,
+                    cargando = detalleCargando,
+                    onVolver = viewModel::cerrarDetalle,
+                    onConsultar = viewModel::consultarDetalle,
+                )
+            } else {
+                ResultsScreenConectada(
+                    listas = s.listas,
+                    errores = s.errores,
+                    diagnostico = s.diagnostico,
+                    registro = s.registro,
+                    onEscanearDeNuevo = viewModel::reiniciar,
+                    onCompartirRegistro = { compartirRegistro(contexto, s.errores, s.diagnostico, s.registro) },
+                    onListaElegida = viewModel::abrirDetalle,
+                )
+            }
         }
     }
 }
@@ -332,6 +364,7 @@ private fun ResultsScreenConectada(
     registro: List<String> = emptyList(),
     onEscanearDeNuevo: () -> Unit,
     onCompartirRegistro: (() -> Unit)? = null,
+    onListaElegida: (ListaValidada) -> Unit = {},
 ) {
     val contexto = LocalContext.current
     val credencialesBot = remember { CredencialesBotTelegram(contexto) }
@@ -344,6 +377,7 @@ private fun ResultsScreenConectada(
         registro = registro,
         onEscanearDeNuevo = onEscanearDeNuevo,
         onCompartirRegistro = onCompartirRegistro,
+        onListaElegida = onListaElegida,
         onGuardarTxt = {
             val archivo = ResultadosExportador.guardarArchivo(contexto, listas)
             ResultadosExportador.compartirArchivo(contexto, archivo)
@@ -359,6 +393,57 @@ private fun ResultsScreenConectada(
                     val error = TelegramBotClient.enviarArchivo(token, chatId, archivo)
                     val mensaje = error?.let { "No se pudo enviar: $it" } ?: "Enviado a Telegram."
                     Toast.makeText(contexto, mensaje, Toast.LENGTH_LONG).show()
+                }
+            }
+        },
+    )
+}
+
+/**
+ * [DetalleListaScreen] con "Guardar .txt" y "Enviar a Telegram" ya
+ * conectados, igual que [ResultsScreenConectada] pero para una sola lista
+ * con su [DetalleLista] — pedido explícito del usuario: poder guardar o
+ * enviar SOLO la lista que está mirando, sin mandar también el resto.
+ * Esos botones no aparecen hasta que [detalle] no sea `null` (ver
+ * [DetalleListaScreen]), así que no hace falta más condición acá.
+ */
+@Composable
+private fun DetalleListaConectada(
+    lista: ListaValidada,
+    detalle: DetalleLista?,
+    cargando: Boolean,
+    onVolver: () -> Unit,
+    onConsultar: () -> Unit,
+) {
+    val contexto = LocalContext.current
+    val credencialesBot = remember { CredencialesBotTelegram(contexto) }
+    val scope = rememberCoroutineScope()
+
+    DetalleListaScreen(
+        lista = lista,
+        detalle = detalle,
+        cargando = cargando,
+        onVolver = onVolver,
+        onConsultar = onConsultar,
+        onGuardarTxt = detalle?.let { detalleListo ->
+            {
+                val archivo = ResultadosExportador.guardarArchivoDetalle(contexto, lista, detalleListo)
+                ResultadosExportador.compartirArchivo(contexto, archivo)
+            }
+        },
+        onEnviarTelegram = detalle?.let { detalleListo ->
+            {
+                val token = credencialesBot.obtenerBotToken()
+                val chatId = credencialesBot.obtenerChatId()
+                if (token.isNullOrBlank() || chatId.isNullOrBlank()) {
+                    Toast.makeText(contexto, "Configura el bot de Telegram en Ajustes primero.", Toast.LENGTH_LONG).show()
+                } else {
+                    val archivo = ResultadosExportador.guardarArchivoDetalle(contexto, lista, detalleListo)
+                    scope.launch {
+                        val error = TelegramBotClient.enviarArchivo(token, chatId, archivo)
+                        val mensaje = error?.let { "No se pudo enviar: $it" } ?: "Enviado a Telegram."
+                        Toast.makeText(contexto, mensaje, Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         },

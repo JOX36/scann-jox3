@@ -464,6 +464,57 @@ puede mostrar la IP real del servidor como alternativa.
       Resultados. Si el host YA es una IP, no se muestra nada (no hay
       nada que "alternar").
 
+## Etapa 14: botones atrás, filtro por tipo de chat y detalle por lista con información a demanda
+
+Tres pedidos explícitos del usuario, además de una corrección de un bug
+real reportado con captura de pantalla:
+
+- [x] **Bug: el enlace por IP no se generaba** para una lista con host de
+      dominio (confirmado con el usuario que el host era un dominio, no
+      una IP). La causa no era un fallo real de DNS sino el tiempo de
+      espera (`XtreamClient.TIMEOUT_DNS_MS`, antes 4s) agotándose bajo la
+      carga de un escaneo con muchos enlaces en paralelo. Se subió a 12s.
+- [x] **Botones "atrás"** en todo el flujo de escaneo (elegir host,
+      elegir chat único, elegir varios chats): antes, si el usuario se
+      equivocaba de pantalla no había forma de volver sin cerrar la app.
+      Nuevo `ScanFlowViewModel.volver()` + composable reusable
+      `ui/common/BarraVolver.kt`.
+- [x] **Filtro por tipo de chat** (Todos / Grupos / Canales / Chats) en
+      las pantallas de selección de chats, para no tener que revisar
+      chats de a uno cuando hay muchos — `ui/common/FiltroTipoChatChips.kt`.
+- [x] **Detalle por lista con información a demanda, sin ir a Telegram**:
+      al tocar un resultado se abre una pantalla de detalle
+      (`DetalleListaScreen`) con los datos que ya se tenían del escaneo
+      (usuario, contraseña, vencimiento, timezone, etc.) y un botón
+      "Consultar información extra" que, solo si el usuario lo toca,
+      pide aparte (`consultarDetalleLista`, en `DetalleLista.kt`):
+      listado completo de canales/series/películas por nombre, y
+      geolocalización de la IP real del servidor (ciudad, país con
+      bandera, ISP) vía `ipapi.co` (se eligió por soportar HTTPS en el
+      plan gratuito — `ip-api.com` solo da HTTP gratis, y Android
+      bloquea tráfico sin cifrar por defecto). Deliberadamente esto NO
+      se agregó al escaneo masivo: pedir nombre completo de canales o
+      geolocalizar la IP de cientos de listas a la vez sería mucho más
+      lento y más carga de red de la necesaria para listas que el
+      usuario ni va a mirar en detalle.
+- [x] **Guardar/enviar esa lista sola, independiente del resto**: la
+      pantalla de detalle tiene sus propios botones "Guardar .txt" /
+      "Enviar a Telegram" (`ResultadosExportador.generarContenidoDetalle`
+      / `guardarArchivoDetalle`), separados de los botones de Resultados
+      que guardan/mandan todas las listas juntas. Y solo aparecen
+      después de que el usuario pidió la información extra — así, si
+      solo está mirando (consultando) no se envía ni guarda nada; eso
+      pasa únicamente si el usuario toca el botón.
+- [x] El formato del `.txt` masivo (Resultados → Guardar/Enviar) también
+      se enriqueció con tres datos que no cuestan una llamada de red
+      nueva porque ya estaban disponibles o son pura construcción de
+      texto: emoji de estado/días por vencer (🟢/🟡/🔴 según
+      `diasRestantes`), bandera de país aproximada a partir del
+      timezone (`XtreamClient.PAIS_POR_TIMEZONE` — mapa a propósito
+      incompleto: antes mostrar nada que arriesgar una bandera
+      equivocada) y el enlace M3U armado con la IP alternativa en vez
+      del dominio, cuando esa IP ya se había resuelto.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

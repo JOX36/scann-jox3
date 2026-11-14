@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.jox3.scanner.scan.data.ChatTelegram
+import com.jox3.scanner.scan.engine.DetalleLista
 import com.jox3.scanner.scan.engine.ListaValidada
+import com.jox3.scanner.scan.engine.consultarDetalleLista
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -96,6 +98,19 @@ class ScanFlowViewModel(
     private var erroresActuales: List<String> = emptyList()
     private var diagnosticoActual: List<String> = emptyList()
     private var registroActual: List<String> = emptyList()
+
+    // Detalle de una lista puntual (pedido explícito del usuario: poder
+    // tocar un resultado y consultar su info extra sin ir a Telegram).
+    // Vive aparte del [estado] principal porque no es un paso más del
+    // flujo de escaneo: es una capa que se abre encima de "Resultados" y
+    // se cierra sin afectar nada de lo ya escaneado.
+    private val _listaDetalle = MutableStateFlow<ListaValidada?>(null)
+    val listaDetalle: StateFlow<ListaValidada?> = _listaDetalle.asStateFlow()
+    private val _detalleInfo = MutableStateFlow<DetalleLista?>(null)
+    val detalleInfo: StateFlow<DetalleLista?> = _detalleInfo.asStateFlow()
+    private val _detalleCargando = MutableStateFlow(false)
+    val detalleCargando: StateFlow<Boolean> = _detalleCargando.asStateFlow()
+    private var detalleJob: Job? = null
 
     init {
         cargarChats()
@@ -311,6 +326,34 @@ class ScanFlowViewModel(
 
     /** Vuelve al menú de modos para escanear de nuevo. */
     fun reiniciar() = cargarChats()
+
+    /** Abre el detalle de [lista] (pantalla aparte); la consulta extra no arranca sola, ver [consultarDetalle]. */
+    fun abrirDetalle(lista: ListaValidada) {
+        detalleJob?.cancel()
+        _listaDetalle.value = lista
+        _detalleInfo.value = null
+        _detalleCargando.value = false
+    }
+
+    /** Cierra el detalle y vuelve a Resultados. */
+    fun cerrarDetalle() {
+        detalleJob?.cancel()
+        _listaDetalle.value = null
+        _detalleInfo.value = null
+        _detalleCargando.value = false
+    }
+
+    /** Pide la info extra de la lista abierta (canales/series/películas, geolocalización de IP) — ver [consultarDetalleLista]. */
+    fun consultarDetalle() {
+        val lista = _listaDetalle.value ?: return
+        if (_detalleCargando.value) return
+        _detalleCargando.value = true
+        detalleJob = viewModelScope.launch {
+            val resultado = runCatching { consultarDetalleLista(lista) }.getOrNull()
+            _detalleInfo.value = resultado
+            _detalleCargando.value = false
+        }
+    }
 }
 
 class ScanFlowViewModelFactory(

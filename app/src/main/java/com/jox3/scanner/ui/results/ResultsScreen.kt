@@ -56,6 +56,7 @@ fun ResultsScreen(
     onGuardarTxt: (() -> Unit)? = null,
     onEnviarTelegram: (() -> Unit)? = null,
     onCompartirRegistro: (() -> Unit)? = null,
+    onListaElegida: (ListaValidada) -> Unit = {},
 ) {
     val activas = listas.filter { it.activa }
     val latam = activas.filter { it.esLatino }
@@ -122,7 +123,7 @@ fun ResultsScreen(
             )
         } else {
             LazyColumn(modifier = Modifier.weight(1f)) {
-                items(listaMostrada) { lista -> FilaResultado(lista) }
+                items(listaMostrada) { lista -> FilaResultado(lista, onClick = { onListaElegida(lista) }) }
             }
         }
 
@@ -183,10 +184,11 @@ private fun FiltroChip(etiqueta: String, seleccionado: Boolean, onClick: () -> U
  * ubicación) y cantidad de canales.
  */
 @Composable
-internal fun FilaResultado(lista: ListaValidada) {
+internal fun FilaResultado(lista: ListaValidada, onClick: (() -> Unit)? = null) {
     Surface(
         color = SuperficieApp,
         shape = RoundedCornerShape(12.dp),
+        onClick = onClick ?: {},
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {

@@ -30,6 +30,8 @@ data class ListaValidada(
     val formatos: String? = null,
     /** IP real del servidor cuando [credenciales].host es un dominio — ver [XtreamClient.resolverIp]. */
     val direccionIp: String? = null,
+    /** Texto crudo de estado del panel ("Active") — ver [XtreamClient.InfoCuentaXtream.estadoTexto]. */
+    val estadoTexto: String? = null,
 )
 
 /** Muestra de nombres de canal usada para la detección LATAM — igual al `limite` que usaba Python. */
@@ -96,5 +98,6 @@ suspend fun validarYEnriquecer(cred: CredencialesXtream, origenChat: String): Li
         fechaCreacion = info.fechaCreacion,
         formatos = info.formatos,
         direccionIp = ip,
+        estadoTexto = info.estadoTexto,
     )
 }
