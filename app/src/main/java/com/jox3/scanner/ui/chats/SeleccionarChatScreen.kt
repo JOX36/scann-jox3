@@ -22,19 +22,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jox3.scanner.scan.data.ChatTelegram
+import com.jox3.scanner.scan.data.TipoChat
+import com.jox3.scanner.ui.common.BarraVolver
+import com.jox3.scanner.ui.common.FiltroTipoChatChips
 import com.jox3.scanner.ui.theme.SuperficieApp
 
 /** Pantalla para elegir un único chat (modos "...en un chat específico"). */
 @Composable
-fun SeleccionarChatScreen(chats: List<ChatTelegram>, onChatElegido: (ChatTelegram) -> Unit) {
+fun SeleccionarChatScreen(chats: List<ChatTelegram>, onChatElegido: (ChatTelegram) -> Unit, onVolver: () -> Unit) {
     var busqueda by remember { mutableStateOf("") }
-    val chatsFiltrados = if (busqueda.isBlank()) {
-        chats
-    } else {
-        chats.filter { it.titulo.contains(busqueda, ignoreCase = true) }
-    }
+    var filtroTipo by remember { mutableStateOf<TipoChat?>(null) }
+    val chatsFiltrados = chats
+        .filter { busqueda.isBlank() || it.titulo.contains(busqueda, ignoreCase = true) }
+        .filter { filtroTipo == null || it.tipo == filtroTipo }
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+        BarraVolver(onVolver)
         Text("Elige un chat", fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
@@ -44,6 +47,8 @@ fun SeleccionarChatScreen(chats: List<ChatTelegram>, onChatElegido: (ChatTelegra
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        Spacer(Modifier.height(12.dp))
+        FiltroTipoChatChips(filtroActual = filtroTipo, onFiltroElegido = { filtroTipo = it })
         Spacer(Modifier.height(12.dp))
         LazyColumn {
             items(chatsFiltrados, key = { it.id }) { chat ->

@@ -18,14 +18,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jox3.scanner.ui.common.BarraVolver
 import com.jox3.scanner.ui.theme.TextoSecundario
 
 /** Pantalla para escribir el host/dominio a buscar (modos "buscar un host..."). */
 @Composable
-fun HostInputScreen(onHostConfirmado: (String) -> Unit) {
+fun HostInputScreen(onHostConfirmado: (String) -> Unit, onVolver: () -> Unit) {
     var host by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+        BarraVolver(onVolver)
         Text("¿Qué host quieres buscar?", fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
         Text("Por ejemplo: servidor.com", color = TextoSecundario, fontSize = 13.sp)

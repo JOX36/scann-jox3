@@ -34,8 +34,17 @@ sealed class EstadoFlujoEscaneo {
     /** Pide el host a buscar; [modo] decide a dónde va después de confirmarlo. */
     data class EscribiendoHost(val chats: List<ChatTelegram>, val modo: TipoModo) : EstadoFlujoEscaneo()
 
-    /** Elegir un único chat. [host] nulo significa que el modo es "solo LATINO", no búsqueda por host. */
-    data class EligiendoChatUnico(val chats: List<ChatTelegram>, val host: String?) : EstadoFlujoEscaneo()
+    /**
+     * Elegir un único chat. [host] nulo significa que el modo es "solo
+     * LATINO", no búsqueda por host. [origenModo] se guarda para que
+     * [ScanFlowViewModel.volver] sepa a qué pantalla anterior volver
+     * (a "escribir host" si vino de ahí, o directo al menú si no).
+     */
+    data class EligiendoChatUnico(
+        val chats: List<ChatTelegram>,
+        val host: String?,
+        val origenModo: TipoModo,
+    ) : EstadoFlujoEscaneo()
 
     data class SeleccionandoChats(
         val chats: List<ChatTelegram>,
@@ -112,7 +121,7 @@ class ScanFlowViewModel(
             TipoModo.HOST_EN_TODOS_LOS_CHATS, TipoModo.HOST_EN_UN_CHAT ->
                 _estado.value = EstadoFlujoEscaneo.EscribiendoHost(chatsCache, modo)
             TipoModo.LATINO_EN_UN_CHAT ->
-                _estado.value = EstadoFlujoEscaneo.EligiendoChatUnico(chatsCache, host = null)
+                _estado.value = EstadoFlujoEscaneo.EligiendoChatUnico(chatsCache, host = null, origenModo = TipoModo.LATINO_EN_UN_CHAT)
             TipoModo.ARCHIVO_LOCAL -> Unit
         }
     }
@@ -127,7 +136,7 @@ class ScanFlowViewModel(
             TipoModo.HOST_EN_TODOS_LOS_CHATS ->
                 iniciarEscaneo(actual.chats, filtroHost = hostLimpio, soloLatino = false)
             TipoModo.HOST_EN_UN_CHAT ->
-                _estado.value = EstadoFlujoEscaneo.EligiendoChatUnico(actual.chats, host = hostLimpio)
+                _estado.value = EstadoFlujoEscaneo.EligiendoChatUnico(actual.chats, host = hostLimpio, origenModo = TipoModo.HOST_EN_UN_CHAT)
             else -> Unit
         }
     }
@@ -142,6 +151,30 @@ class ScanFlowViewModel(
     /** Vuelve del selector de archivo cancelado, o de cualquier pantalla intermedia, al menú de modos. */
     fun volverAElegirModo() {
         _estado.value = EstadoFlujoEscaneo.EligiendoModo(chatsCache)
+    }
+
+    /**
+     * Botón "← Volver" de las pantallas intermedias (pedido explícito del
+     * usuario: antes no había forma de retroceder y había que cerrar la
+     * app). Retrocede un paso en el flujo según en qué pantalla esté:
+     * - "Escribir host" y "Elegir varios chats" vuelven directo al menú de
+     *   modos (son el primer paso después de elegir el modo).
+     * - "Elegir un chat" vuelve a "Escribir host" si ese modo pasaba por
+     *   ahí (host en un chat específico), o al menú si no (solo LATINO).
+     */
+    fun volver() {
+        when (val actual = _estado.value) {
+            is EstadoFlujoEscaneo.EscribiendoHost -> volverAElegirModo()
+            is EstadoFlujoEscaneo.SeleccionandoChats -> volverAElegirModo()
+            is EstadoFlujoEscaneo.EligiendoChatUnico -> {
+                if (actual.origenModo == TipoModo.HOST_EN_UN_CHAT) {
+                    _estado.value = EstadoFlujoEscaneo.EscribiendoHost(actual.chats, TipoModo.HOST_EN_UN_CHAT)
+                } else {
+                    volverAElegirModo()
+                }
+            }
+            else -> Unit
+        }
     }
 
     fun alternarSeleccion(chatId: Long) {

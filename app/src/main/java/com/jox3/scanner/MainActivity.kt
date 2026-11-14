@@ -273,11 +273,11 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
         }
 
         is EstadoFlujoEscaneo.EscribiendoHost -> {
-            HostInputScreen(onHostConfirmado = viewModel::hostConfirmado)
+            HostInputScreen(onHostConfirmado = viewModel::hostConfirmado, onVolver = viewModel::volver)
         }
 
         is EstadoFlujoEscaneo.EligiendoChatUnico -> {
-            SeleccionarChatScreen(chats = s.chats, onChatElegido = viewModel::chatUnicoElegido)
+            SeleccionarChatScreen(chats = s.chats, onChatElegido = viewModel::chatUnicoElegido, onVolver = viewModel::volver)
         }
 
         is EstadoFlujoEscaneo.SeleccionandoChats -> {
@@ -286,6 +286,7 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                 seleccionados = s.seleccionados,
                 onAlternarSeleccion = viewModel::alternarSeleccion,
                 onEscanear = viewModel::iniciarEscaneoDeSeleccionados,
+                onVolver = viewModel::volver,
             )
         }
 
