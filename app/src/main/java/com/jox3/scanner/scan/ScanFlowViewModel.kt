@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.jox3.scanner.scan.data.ChatTelegram
+import com.jox3.scanner.scan.data.TemaChat
+import com.jox3.scanner.scan.data.TipoChat
 import com.jox3.scanner.scan.engine.DetalleLista
 import com.jox3.scanner.scan.engine.ListaValidada
 import com.jox3.scanner.scan.engine.consultarDetalleLista
@@ -26,6 +28,9 @@ enum class TipoModo {
     LATINO_EN_UN_CHAT,
     ARCHIVO_LOCAL,
 }
+
+/** Un grupo con "Temas" y los temas entre los que el usuario puede elegir. */
+data class ForoConTemas(val chat: ChatTelegram, val temas: List<TemaChat>)
 
 /** Estados del flujo completo: cargar chats → elegir modo → (host/chat) → escanear → ver resultados. */
 sealed class EstadoFlujoEscaneo {
@@ -51,6 +56,23 @@ sealed class EstadoFlujoEscaneo {
     data class SeleccionandoChats(
         val chats: List<ChatTelegram>,
         val seleccionados: Set<Long>,
+    ) : EstadoFlujoEscaneo()
+
+    /** Comprobando si algún chat elegido es un grupo con "Temas" antes de escanear. */
+    object BuscandoTemas : EstadoFlujoEscaneo()
+
+    /**
+     * Algún chat elegido tiene "Temas": el usuario marca cuáles escanear.
+     * [seleccion] guarda, por chat, los ids de tema marcados (por defecto todos).
+     * [anterior] es la pantalla a la que vuelve el botón "Volver".
+     */
+    data class EligiendoTemas(
+        val anterior: EstadoFlujoEscaneo,
+        val chats: List<ChatTelegram>,
+        val filtroHost: String?,
+        val soloLatino: Boolean,
+        val foros: List<ForoConTemas>,
+        val seleccion: Map<Long, Set<Int>>,
     ) : EstadoFlujoEscaneo()
 
     data class Escaneando(
@@ -160,7 +182,7 @@ class ScanFlowViewModel(
         val actual = _estado.value
         if (actual !is EstadoFlujoEscaneo.EligiendoChatUnico) return
         val host = actual.host
-        iniciarEscaneo(listOf(chat), filtroHost = host, soloLatino = host == null)
+        prepararEscaneo(listOf(chat), filtroHost = host, soloLatino = host == null)
     }
 
     /** Vuelve del selector de archivo cancelado, o de cualquier pantalla intermedia, al menú de modos. */
@@ -179,6 +201,7 @@ class ScanFlowViewModel(
      */
     fun volver() {
         when (val actual = _estado.value) {
+            is EstadoFlujoEscaneo.EligiendoTemas -> _estado.value = actual.anterior
             is EstadoFlujoEscaneo.EscribiendoHost -> volverAElegirModo()
             is EstadoFlujoEscaneo.SeleccionandoChats -> volverAElegirModo()
             is EstadoFlujoEscaneo.EligiendoChatUnico -> {
@@ -207,7 +230,70 @@ class ScanFlowViewModel(
         val actual = _estado.value
         if (actual !is EstadoFlujoEscaneo.SeleccionandoChats || actual.seleccionados.isEmpty()) return
         val chatsElegidos = actual.chats.filter { it.id in actual.seleccionados }
-        iniciarEscaneo(chatsElegidos, filtroHost = null, soloLatino = false)
+        prepararEscaneo(chatsElegidos, filtroHost = null, soloLatino = false)
+    }
+
+    /**
+     * Antes de escanear, mira si alguno de los chats es un grupo con
+     * "Temas"; si lo es, deja elegir cuáles temas escanear (por defecto
+     * todos). Si ninguno lo es, o la consulta falla, escanea directo como
+     * siempre.
+     */
+    private fun prepararEscaneo(chats: List<ChatTelegram>, filtroHost: String?, soloLatino: Boolean) {
+        val anterior = _estado.value
+        _estado.value = EstadoFlujoEscaneo.BuscandoTemas
+        viewModelScope.launch {
+            val foros = chats.filter { it.tipo == TipoChat.GRUPO }.mapNotNull { chat ->
+                val temas = runCatching { chatsRepository.listarTemas(chat.id) }.getOrDefault(emptyList())
+                if (temas.size > 1) ForoConTemas(chat, temas) else null
+            }
+            if (foros.isEmpty()) {
+                iniciarEscaneo(chats, filtroHost, soloLatino)
+            } else {
+                _estado.value = EstadoFlujoEscaneo.EligiendoTemas(
+                    anterior = anterior,
+                    chats = chats,
+                    filtroHost = filtroHost,
+                    soloLatino = soloLatino,
+                    foros = foros,
+                    seleccion = foros.associate { it.chat.id to it.temas.map { t -> t.id }.toSet() },
+                )
+            }
+        }
+    }
+
+    fun alternarTema(chatId: Long, temaId: Int) {
+        val actual = _estado.value
+        if (actual !is EstadoFlujoEscaneo.EligiendoTemas) return
+        val marcados = actual.seleccion[chatId].orEmpty()
+        val nuevos = if (temaId in marcados) marcados - temaId else marcados + temaId
+        _estado.value = actual.copy(seleccion = actual.seleccion + (chatId to nuevos))
+    }
+
+    /** Marca o desmarca todos los temas de un grupo de una vez. */
+    fun alternarTodosLosTemas(chatId: Long) {
+        val actual = _estado.value
+        if (actual !is EstadoFlujoEscaneo.EligiendoTemas) return
+        val foro = actual.foros.firstOrNull { it.chat.id == chatId } ?: return
+        val todos = foro.temas.map { it.id }.toSet()
+        val nuevos = if (actual.seleccion[chatId] == todos) emptySet() else todos
+        _estado.value = actual.copy(seleccion = actual.seleccion + (chatId to nuevos))
+    }
+
+    fun confirmarTemas() {
+        val actual = _estado.value
+        if (actual !is EstadoFlujoEscaneo.EligiendoTemas) return
+        val chatsFinales = actual.chats.mapNotNull { chat ->
+            val foro = actual.foros.firstOrNull { it.chat.id == chat.id } ?: return@mapNotNull chat
+            val marcados = actual.seleccion[chat.id].orEmpty()
+            when {
+                marcados.isEmpty() -> null // sin ningún tema marcado: ese grupo se omite
+                marcados.size == foro.temas.size -> chat // todos: lectura normal de siempre
+                else -> chat.copy(temaIds = marcados)
+            }
+        }
+        if (chatsFinales.isEmpty()) return
+        iniciarEscaneo(chatsFinales, actual.filtroHost, actual.soloLatino)
     }
 
     /** Escanea un archivo .txt local, ya leído por la UI vía Storage Access Framework. */
@@ -346,7 +432,7 @@ class ScanFlowViewModel(
     /** Pide la info extra de la lista abierta (canales/series/películas, geolocalización de IP) — ver [consultarDetalleLista]. */
     fun consultarDetalle() {
         val lista = _listaDetalle.value ?: return
-        if (_detalleCargando.value) return
+        if (_detalleCargando.value || _detalleInfo.value != null) return
         _detalleCargando.value = true
         detalleJob = viewModelScope.launch {
             val resultado = runCatching { consultarDetalleLista(lista) }.getOrNull()

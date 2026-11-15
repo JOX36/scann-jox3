@@ -13,4 +13,12 @@ data class ChatTelegram(
     val titulo: String,
     val tipo: TipoChat,
     val mensajesAprox: Int = 0,
+    /**
+     * Si no es nulo, solo se leen estos temas (ids de foro) de un grupo con
+     * "Temas" — elegidos por el usuario antes de escanear. Nulo = todos.
+     */
+    val temaIds: Set<Int>? = null,
 )
+
+/** Un tema (topic) de un grupo con "Temas" activado. */
+data class TemaChat(val id: Int, val nombre: String)

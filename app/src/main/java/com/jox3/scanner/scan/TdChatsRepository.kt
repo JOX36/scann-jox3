@@ -1,6 +1,7 @@
 package com.jox3.scanner.scan
 
 import com.jox3.scanner.scan.data.ChatTelegram
+import com.jox3.scanner.scan.data.TemaChat
 import com.jox3.scanner.scan.data.TipoChat
 import com.jox3.scanner.telegram.TdLibAuthClient
 import org.drinkless.tdlib.TdApi
@@ -36,6 +37,32 @@ class TdChatsRepository(private val sesion: TdLibAuthClient) : ChatsRepository {
         }
     }
 
+    override suspend fun listarTemas(chatId: Long): List<TemaChat> {
+        val chat = sesion.enviarYEsperar(TdApi.GetChat(chatId)) as? TdApi.Chat ?: return emptyList()
+        val tipo = chat.type as? TdApi.ChatTypeSupergroup ?: return emptyList()
+        val supergrupo = sesion.enviarYEsperar(TdApi.GetSupergroup(tipo.supergroupId)) as? TdApi.Supergroup
+            ?: return emptyList()
+        if (!supergrupo.isForum) return emptyList()
+
+        val temas = mutableListOf<TemaChat>()
+        var offsetDate = 0
+        var offsetMessageId = 0L
+        var offsetTemaId = 0
+        while (true) {
+            val resultado = sesion.enviarYEsperar(
+                TdApi.GetForumTopics(chatId, "", offsetDate, offsetMessageId, offsetTemaId, LOTE_TEMAS)
+            ) as? TdApi.ForumTopics ?: break
+            val lote = resultado.topics?.filterNotNull().orEmpty()
+            if (lote.isEmpty()) break
+            temas += lote.map { TemaChat(it.info.forumTopicId, it.info.name.ifBlank { "Tema ${it.info.forumTopicId}" }) }
+            if (lote.size < LOTE_TEMAS) break
+            offsetDate = resultado.nextOffsetDate
+            offsetMessageId = resultado.nextOffsetMessageId
+            offsetTemaId = resultado.nextOffsetForumTopicId
+        }
+        return temas
+    }
+
     private suspend fun cargarTodosLosChats() {
         while (true) {
             try {
@@ -60,5 +87,6 @@ class TdChatsRepository(private val sesion: TdLibAuthClient) : ChatsRepository {
     private companion object {
         const val LOTE_CARGA = 100
         const val LIMITE_ALTO = 2000
+        const val LOTE_TEMAS = 100
     }
 }

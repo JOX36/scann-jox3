@@ -1,6 +1,7 @@
 package com.jox3.scanner.scan
 
 import com.jox3.scanner.scan.data.ChatTelegram
+import com.jox3.scanner.scan.data.TemaChat
 import com.jox3.scanner.scan.data.TipoChat
 import kotlinx.coroutines.delay
 
@@ -12,6 +13,9 @@ import kotlinx.coroutines.delay
  */
 interface ChatsRepository {
     suspend fun listarChats(): List<ChatTelegram>
+
+    /** Temas del chat si es un grupo con "Temas" activado; lista vacía si no lo es. */
+    suspend fun listarTemas(chatId: Long): List<TemaChat> = emptyList()
 }
 
 /** Lista de chats de ejemplo, con nombres parecidos a los reales del usuario. */

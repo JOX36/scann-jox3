@@ -549,6 +549,28 @@ maqueta de muestra.
       paleta oscura nueva del tema, pero no tienen el tratamiento "de
       vidrio" con borde.
 
+## Etapa 16: elegir temas de un grupo, texto legible y detalle completo
+
+- [x] **Elegir qué temas escanear**: antes de escanear, si algún chat
+      elegido es un grupo con "Temas" (y tiene más de uno), aparece una
+      pantalla (`ElegirTemasScreen`) con los temas de cada grupo
+      marcados por defecto; se desmarcan los que no se quieran leer.
+      Todos marcados = lectura normal de siempre; algunos = solo esos
+      (`ChatTelegram.temaIds`); ninguno = ese grupo se omite. Modo
+      "host en todos los chats" no pregunta (son demasiados chats). Si
+      la consulta de temas falla, escanea directo como antes.
+- [x] **Texto negro ilegible**: al reemplazar el `Surface` raíz por
+      `FondoConGlow` en la Etapa 15, todo `Text` sin color explícito
+      quedó en negro sobre el fondo oscuro (títulos de chats, etc.).
+      `FondoConGlow` ahora provee `LocalContentColor` claro.
+- [x] **Detalle individual = el ejemplo del usuario**: la pantalla de
+      detalle muestra el mismo bloque completo de su `.txt` de ejemplo
+      (estado, conexiones, fechas, timezone con bandera, servidor real
+      con ISP, M3U/EPG/M3U por IP y listas de TV en vivo/series/
+      películas), seleccionable/copiable. La consulta extra arranca sola
+      al abrir (con "Reintentar" si falla). Guardar/Enviar siguen siendo
+      botones propios de esa lista: mirar no envía nada.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

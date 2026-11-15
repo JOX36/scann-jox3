@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.jox3.scanner.ui.theme.AcentoApp
 import com.jox3.scanner.ui.theme.AcentoSecundario
 import com.jox3.scanner.ui.theme.FondoApp
+import com.jox3.scanner.ui.theme.TextoPrimario
 
 /**
  * Fondo de toda la app: igual que en el preview "Glass HUD" elegido por el
@@ -44,6 +47,11 @@ fun FondoConGlow(modifier: Modifier = Modifier, content: @Composable BoxScope.()
                 .blur(70.dp)
                 .background(Brush.radialGradient(listOf(AcentoSecundario.copy(alpha = 0.16f), Color.Transparent))),
         )
-        content()
+        // Sin el Surface raíz que había antes, el color de texto por defecto
+        // (LocalContentColor) quedaba en negro sobre el fondo oscuro: todo
+        // Text sin color explícito se veía casi invisible.
+        CompositionLocalProvider(LocalContentColor provides TextoPrimario) {
+            content()
+        }
     }
 }

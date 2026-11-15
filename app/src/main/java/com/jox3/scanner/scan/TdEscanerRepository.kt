@@ -47,7 +47,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         for (chat in chats) {
             registrar("📂 Leyendo \"${chat.titulo}\"...")
             val mensajes = try {
-                obtenerMensajesRecientes(chat.id, chat.titulo, registrar)
+                obtenerMensajesRecientes(chat.id, chat.titulo, registrar, temaIds = chat.temaIds)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -159,7 +159,27 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         chatTitulo: String,
         registrar: suspend (String) -> Unit,
         limite: Int = LIMITE_MENSAJES,
+        temaIds: Set<Int>? = null,
     ): List<TdApi.Message> {
+        // El usuario eligió temas puntuales de este grupo: se leen solo esos,
+        // sin pedir la lista completa de temas ni caer al historial normal.
+        if (temaIds != null) {
+            registrar("   leyendo solo ${temaIds.size} tema(s) elegido(s)")
+            val elegidos = mutableListOf<TdApi.Message>()
+            for (temaId in temaIds) {
+                try {
+                    val delTema = obtenerMensajesDeTema(chatId, temaId, limite)
+                    registrar("   tema $temaId: ${delTema.size} mensaje(s)")
+                    elegidos += delTema
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    registrar("   tema $temaId: falló (${e.message ?: "error desconocido"})")
+                }
+            }
+            return elegidos
+        }
+
         val esForo = esChatConTemas(chatId)
         registrar("   ¿tiene Temas? ${if (esForo) "sí" else "no"}")
 

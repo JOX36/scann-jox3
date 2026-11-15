@@ -108,7 +108,7 @@ object ResultadosExportador {
      * de las listas. Mismos campos que [generarContenido] más lo que trae
      * [detalle] (ver [com.jox3.scanner.scan.engine.consultarDetalleLista]).
      */
-    fun generarContenidoDetalle(lista: ListaValidada, detalle: DetalleLista): String {
+    fun generarContenidoDetalle(lista: ListaValidada, detalle: DetalleLista?): String {
         val cred = lista.credenciales
         val banderaTz = XtreamClient.banderaDesdeTimezone(lista.zonaHoraria)
         val builder = StringBuilder()
@@ -127,24 +127,31 @@ object ResultadosExportador {
         builder.appendLine("🕒 Timezone: ${lista.zonaHoraria ?: "N/A"}${if (banderaTz.isNotEmpty()) " $banderaTz" else ""}")
         builder.appendLine("🧪 Prueba: ${if (lista.esPrueba) "Sí" else "No"}")
         builder.appendLine("🎞️ Formatos: ${lista.formatos ?: "N/A"}")
-        if (detalle.geoIp != null) {
-            val bandera = XtreamClient.banderaDesdeCodigoPais(detalle.geoIp.codigoPais)
-            val lugar = listOfNotNull(detalle.geoIp.ciudad, detalle.geoIp.pais).joinToString(", ")
-            val isp = detalle.geoIp.isp?.let { " | ISP: $it" } ?: ""
+        val geoIp = detalle?.geoIp
+        if (geoIp != null) {
+            val bandera = XtreamClient.banderaDesdeCodigoPais(geoIp.codigoPais)
+            val lugar = listOfNotNull(geoIp.ciudad, geoIp.pais).joinToString(", ")
+            val isp = geoIp.isp?.let { " | ISP: $it" } ?: ""
             builder.appendLine("📍 Servidor: $bandera $lugar$isp")
         }
         builder.appendLine("📺 Enlace M3U: ${cred.urlOriginal}")
         builder.appendLine("📜 Enlace EPG: ${epgLink(cred)}")
-        if (detalle.enlaceM3uPorIp != null) {
-            builder.appendLine("📌 M3U por IP: ${detalle.enlaceM3uPorIp}")
+        // Sin consulta extra todavía (o si falló), igual se arma el enlace por
+        // IP con la que ya se resolvió durante el escaneo, si hubo una.
+        val m3uPorIp = detalle?.enlaceM3uPorIp
+            ?: lista.direccionIp?.takeIf { it.isNotBlank() }?.let { XtreamClient.enlacePorIp(cred, it) }
+        if (m3uPorIp != null) {
+            builder.appendLine("📌 M3U por IP: $m3uPorIp")
         }
         builder.appendLine()
-        builder.appendLine("📡 TV en vivo (${detalle.canales.size}): ${detalle.canales.joinToString(", ")}")
-        builder.appendLine()
-        builder.appendLine("🎬 Series (${detalle.series.size}): ${detalle.series.joinToString(", ")}")
-        builder.appendLine()
-        builder.appendLine("🎥 Películas (${detalle.peliculas.size}): ${detalle.peliculas.joinToString(", ")}")
-        builder.appendLine()
+        if (detalle != null) {
+            builder.appendLine("📡 TV en vivo (${detalle.canales.size}): ${detalle.canales.joinToString(", ")}")
+            builder.appendLine()
+            builder.appendLine("🎬 Series (${detalle.series.size}): ${detalle.series.joinToString(", ")}")
+            builder.appendLine()
+            builder.appendLine("🎥 Películas (${detalle.peliculas.size}): ${detalle.peliculas.joinToString(", ")}")
+            builder.appendLine()
+        }
         builder.appendLine("📂 Encontrada en: ${lista.origenChat}")
         builder.appendLine("📅 Escaneado: $escaneadoEn")
 
@@ -160,7 +167,7 @@ object ResultadosExportador {
     }
 
     /** Igual que [guardarArchivo] pero para una sola lista con su detalle (ver [generarContenidoDetalle]). */
-    fun guardarArchivoDetalle(context: Context, lista: ListaValidada, detalle: DetalleLista): File {
+    fun guardarArchivoDetalle(context: Context, lista: ListaValidada, detalle: DetalleLista?): File {
         val carpeta = context.getExternalFilesDir(null) ?: context.filesDir
         val nombreHost = lista.credenciales.host
             .substringAfter("://")

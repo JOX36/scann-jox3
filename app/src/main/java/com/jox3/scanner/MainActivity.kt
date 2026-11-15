@@ -46,6 +46,7 @@ import com.jox3.scanner.scan.TdEscanerRepository
 import com.jox3.scanner.scan.TipoModo
 import com.jox3.scanner.scan.engine.DetalleLista
 import com.jox3.scanner.scan.engine.ListaValidada
+import com.jox3.scanner.ui.chats.ElegirTemasScreen
 import com.jox3.scanner.ui.common.FondoConGlow
 import com.jox3.scanner.ui.results.DetalleListaScreen
 import com.jox3.scanner.telegram.CredencialesApiTelegram
@@ -309,6 +310,27 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
             )
         }
 
+        EstadoFlujoEscaneo.BuscandoTemas -> {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                CircularProgressIndicator(color = AcentoApp)
+            }
+        }
+
+        is EstadoFlujoEscaneo.EligiendoTemas -> {
+            ElegirTemasScreen(
+                foros = s.foros,
+                seleccion = s.seleccion,
+                onAlternarTema = viewModel::alternarTema,
+                onAlternarTodos = viewModel::alternarTodosLosTemas,
+                onEscanear = viewModel::confirmarTemas,
+                onVolver = viewModel::volver,
+            )
+        }
+
         is EstadoFlujoEscaneo.EscribiendoHost -> {
             HostInputScreen(onHostConfirmado = viewModel::hostConfirmado, onVolver = viewModel::volver)
         }
@@ -439,26 +461,31 @@ private fun DetalleListaConectada(
     val credencialesBot = remember { CredencialesBotTelegram(contexto) }
     val scope = rememberCoroutineScope()
 
+    // Al abrir el detalle la consulta arranca sola: el usuario pidió ver
+    // la info completa (como en su ejemplo) sin tener que ir a Telegram ni
+    // tocar un botón extra. Guardar/Enviar siguen siendo acciones aparte.
+    LaunchedEffect(lista) { onConsultar() }
+
     DetalleListaScreen(
         lista = lista,
         detalle = detalle,
         cargando = cargando,
         onVolver = onVolver,
         onConsultar = onConsultar,
-        onGuardarTxt = detalle?.let { detalleListo ->
+        onGuardarTxt = if (cargando) null else {
             {
-                val archivo = ResultadosExportador.guardarArchivoDetalle(contexto, lista, detalleListo)
+                val archivo = ResultadosExportador.guardarArchivoDetalle(contexto, lista, detalle)
                 ResultadosExportador.compartirArchivo(contexto, archivo)
             }
         },
-        onEnviarTelegram = detalle?.let { detalleListo ->
+        onEnviarTelegram = if (cargando) null else {
             {
                 val token = credencialesBot.obtenerBotToken()
                 val chatId = credencialesBot.obtenerChatId()
                 if (token.isNullOrBlank() || chatId.isNullOrBlank()) {
                     Toast.makeText(contexto, "Configura el bot de Telegram en Ajustes primero.", Toast.LENGTH_LONG).show()
                 } else {
-                    val archivo = ResultadosExportador.guardarArchivoDetalle(contexto, lista, detalleListo)
+                    val archivo = ResultadosExportador.guardarArchivoDetalle(contexto, lista, detalle)
                     scope.launch {
                         val error = TelegramBotClient.enviarArchivo(token, chatId, archivo)
                         val mensaje = error?.let { "No se pudo enviar: $it" } ?: "Enviado a Telegram."
