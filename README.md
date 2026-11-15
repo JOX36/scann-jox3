@@ -589,6 +589,28 @@ solo: había que ir a Descargas y tocar el archivo.
 - Siguen siendo del sistema (la app no puede saltarlos): confirmar
   "¿Deseas actualizar esta app?" y el aviso de Play Protect.
 
+## Etapa 18: lectura de mensajes más resistente a los "TDLib no respondió"
+
+Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
+"TDLib no respondió en 25s a GetForumTopicHistory / GetChatHistory".
+
+- [x] **Ya no se pierde lo leído**: antes, si UNA página del historial
+      (de 100 mensajes) no respondía a tiempo, se descartaban también
+      todos los mensajes ya leídos de ese chat/tema (hasta 10.000) y el
+      chat quedaba en 0. Ahora se conserva lo ya leído (lo más reciente)
+      y solo se registra el corte.
+- [x] **Reintentos**: cada petición a TDLib que no responde se reintenta
+      hasta 3 veces con pausa creciente (los errores reales de Telegram
+      no se reintentan).
+- [x] **Ritmo**: pausa de 250 ms entre páginas, para no disparar el
+      límite de peticiones (FLOOD_WAIT) de Telegram.
+- [x] **Conexión visible**: el registro ahora indica el estado de la
+      conexión de TDLib (conectado / conectando / esperando red) al
+      empezar y en cada reintento; si no estaba conectado, espera hasta
+      30 s a que conecte antes de leer.
+- [x] Se "abre" el chat (`OpenChat`) antes de leerlo y se cierra al
+      terminar, como recomienda TDLib.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

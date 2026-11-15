@@ -9,6 +9,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import com.jox3.scanner.telegram.TdLibTimeoutException
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.sync.Semaphore
@@ -39,6 +42,17 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
 
         send(EventoEscaneo.Progreso(0, 0))
         registrar("Escaneo iniciado: ${chats.size} chat(s) seleccionado(s).")
+        registrar("   conexión con Telegram: ${sesion.estadoConexion()}")
+        if (!sesion.conexionLista()) {
+            // Si TDLib todavía no está conectado, las peticiones quedan
+            // esperando y parecen "no respondió": se espera un poco a que
+            // conecte antes de empezar a leer.
+            registrar("   esperando a que Telegram conecte (hasta 30s)...")
+            withTimeoutOrNull(30_000L) {
+                while (!sesion.conexionLista()) delay(500)
+            }
+            registrar("   conexión con Telegram: ${sesion.estadoConexion()}")
+        }
 
         // Primero se junta el texto de todos los mensajes de los chats
         // elegidos y se extraen los enlaces candidatos — igual que el
@@ -46,6 +60,9 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         val enlacesPorOrigen = mutableListOf<Pair<String, String>>()
         for (chat in chats) {
             registrar("📂 Leyendo \"${chat.titulo}\"...")
+            // TDLib recomienda "abrir" el chat antes de leerlo: ayuda a que
+            // sincronice su estado y responda el historial.
+            runCatching { sesion.enviarYEsperar(TdApi.OpenChat(chat.id)) }
             val mensajes = try {
                 obtenerMensajesRecientes(chat.id, chat.titulo, registrar, temaIds = chat.temaIds)
             } catch (e: CancellationException) {
@@ -57,6 +74,8 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
                 registrar("❌ \"${chat.titulo}\": $detalle")
                 send(EventoEscaneo.ErrorEnChat(chat.titulo, detalle))
                 null
+            } finally {
+                runCatching { sesion.enviarYEsperar(TdApi.CloseChat(chat.id)) }
             }
 
             // Si [mensajes] es null fue por un error ya reportado arriba; si
@@ -168,7 +187,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
             val elegidos = mutableListOf<TdApi.Message>()
             for (temaId in temaIds) {
                 try {
-                    val delTema = obtenerMensajesDeTema(chatId, temaId, limite)
+                    val delTema = obtenerMensajesDeTema(chatId, temaId, limite, registrar)
                     registrar("   tema $temaId: ${delTema.size} mensaje(s)")
                     elegidos += delTema
                 } catch (e: CancellationException) {
@@ -209,7 +228,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         } else {
             registrar("   leyendo historial normal...")
         }
-        return obtenerMensajesDeHistorialNormal(chatId, limite)
+        return obtenerMensajesDeHistorialNormal(chatId, limite, registrar)
     }
 
     /** `true` si el chat es un supergrupo con "Temas" (forum topics) activado. */
@@ -221,7 +240,33 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         return supergrupo.isForum
     }
 
-    private suspend fun obtenerMensajesDeHistorialNormal(chatId: Long, limite: Int): List<TdApi.Message> {
+    /**
+     * Pide [peticion] a TDLib y, si Telegram no contesta a tiempo, la
+     * reintenta (hasta [INTENTOS_POR_PETICION] veces, con pausa creciente)
+     * antes de rendirse. Los errores reales de Telegram (chat inválido,
+     * sin permiso, etc.) no se reintentan: se propagan igual que antes.
+     */
+    private suspend fun pedir(registrar: suspend (String) -> Unit, peticion: TdApi.Function<*>): TdApi.Object {
+        var ultimoError: TdLibTimeoutException? = null
+        for (intento in 1..INTENTOS_POR_PETICION) {
+            try {
+                return sesion.enviarYEsperar(peticion)
+            } catch (e: TdLibTimeoutException) {
+                ultimoError = e
+                if (intento < INTENTOS_POR_PETICION) {
+                    registrar("   sin respuesta (intento $intento/$INTENTOS_POR_PETICION, conexión: ${sesion.estadoConexion()}) → reintentando...")
+                    delay(2_000L * intento)
+                }
+            }
+        }
+        throw ultimoError ?: TdLibTimeoutException("TDLib no respondió")
+    }
+
+    private suspend fun obtenerMensajesDeHistorialNormal(
+        chatId: Long,
+        limite: Int,
+        registrar: suspend (String) -> Unit,
+    ): List<TdApi.Message> {
         val mensajes = mutableListOf<TdApi.Message>()
         var fromMessageId = 0L
         var intentosVacios = 0
@@ -230,9 +275,18 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
             // Deja que cualquier error de TDLib se propague: quien llama
             // decide qué hacer con él (ver [escanear], que lo convierte en
             // un [EventoEscaneo.ErrorEnChat] visible en vez de tragárselo).
-            val resultado = sesion.enviarYEsperar(
-                TdApi.GetChatHistory(chatId, fromMessageId, 0, LOTE_POR_PAGINA, false)
-            ) as? TdApi.Messages
+            val resultado = try {
+                pedir(registrar, TdApi.GetChatHistory(chatId, fromMessageId, 0, LOTE_POR_PAGINA, false)) as? TdApi.Messages
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Antes, si UNA página fallaba se perdían también todos los
+                // mensajes ya leídos del chat. Ahora se conservan (los más
+                // recientes, que son los que más importan) y se sigue.
+                if (mensajes.isEmpty()) throw e
+                registrar("   ⚠️ se cortó la lectura tras ${mensajes.size} mensajes (${e.message}); se usan los ya leídos.")
+                break
+            }
 
             val lote = resultado?.messages?.filterNotNull().orEmpty()
 
@@ -244,6 +298,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
             intentosVacios = 0
             mensajes += lote
             fromMessageId = lote.last().id
+            delay(PAUSA_ENTRE_PAGINAS_MS)
         }
 
         return mensajes
@@ -275,13 +330,13 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         // Si esta llamada falla, se deja propagar sin atrapar — quien llama
         // ([obtenerMensajesRecientes]) ya sabe convertirlo en el mensaje de
         // "lectura por Temas falló" y caer al historial normal.
-        val ids = obtenerIdsDeTemas(chatId)
+        val ids = obtenerIdsDeTemas(chatId, registrar)
         registrar("   ${ids.size} tema(s) encontrado(s)")
 
         val mensajes = mutableListOf<TdApi.Message>()
         for (temaId in ids) {
             try {
-                val mensajesDelTema = obtenerMensajesDeTema(chatId, temaId, limitePorTema)
+                val mensajesDelTema = obtenerMensajesDeTema(chatId, temaId, limitePorTema, registrar)
                 registrar("   tema $temaId: ${mensajesDelTema.size} mensaje(s)")
                 mensajes += mensajesDelTema
             } catch (e: CancellationException) {
@@ -296,15 +351,16 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         return mensajes
     }
 
-    private suspend fun obtenerIdsDeTemas(chatId: Long): List<Int> {
+    private suspend fun obtenerIdsDeTemas(chatId: Long, registrar: suspend (String) -> Unit): List<Int> {
         val ids = mutableListOf<Int>()
         var offsetDate = 0
         var offsetMessageId = 0L
         var offsetTemaId = 0
 
         while (true) {
-            val resultado = sesion.enviarYEsperar(
-                TdApi.GetForumTopics(chatId, "", offsetDate, offsetMessageId, offsetTemaId, LOTE_TEMAS)
+            val resultado = pedir(
+                registrar,
+                TdApi.GetForumTopics(chatId, "", offsetDate, offsetMessageId, offsetTemaId, LOTE_TEMAS),
             ) as? TdApi.ForumTopics ?: break
 
             val lote = resultado.topics?.filterNotNull().orEmpty()
@@ -321,15 +377,26 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         return ids
     }
 
-    private suspend fun obtenerMensajesDeTema(chatId: Long, temaId: Int, limite: Int): List<TdApi.Message> {
+    private suspend fun obtenerMensajesDeTema(
+        chatId: Long,
+        temaId: Int,
+        limite: Int,
+        registrar: suspend (String) -> Unit,
+    ): List<TdApi.Message> {
         val mensajes = mutableListOf<TdApi.Message>()
         var fromMessageId = 0L
         var intentosVacios = 0
 
         while (mensajes.size < limite && intentosVacios < MAX_INTENTOS_VACIOS) {
-            val resultado = sesion.enviarYEsperar(
-                TdApi.GetForumTopicHistory(chatId, temaId, fromMessageId, 0, LOTE_POR_PAGINA)
-            ) as? TdApi.Messages
+            val resultado = try {
+                pedir(registrar, TdApi.GetForumTopicHistory(chatId, temaId, fromMessageId, 0, LOTE_POR_PAGINA)) as? TdApi.Messages
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (mensajes.isEmpty()) throw e
+                registrar("   ⚠️ tema $temaId: se cortó tras ${mensajes.size} mensajes (${e.message}); se usan los ya leídos.")
+                break
+            }
 
             val lote = resultado?.messages?.filterNotNull().orEmpty()
 
@@ -341,6 +408,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
             intentosVacios = 0
             mensajes += lote
             fromMessageId = lote.last().id
+            delay(PAUSA_ENTRE_PAGINAS_MS)
         }
 
         return mensajes
@@ -371,6 +439,11 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         // ida-y-vueltas necesarias para llegar a [LIMITE_MENSAJES].
         const val LOTE_POR_PAGINA = 100
         const val MAX_INTENTOS_VACIOS = 5
+        const val INTENTOS_POR_PETICION = 3
+        // Pausa corta entre páginas: leer 100 páginas seguidas sin respiro es lo que más
+        // dispara el límite de peticiones de Telegram (FLOOD_WAIT), que TDLib maneja
+        // esperando sin avisar y desde acá se ve como "no respondió".
+        const val PAUSA_ENTRE_PAGINAS_MS = 250L
         const val LOTE_TEMAS = 100
         const val MAX_VALIDACIONES_EN_PARALELO = 50
     }

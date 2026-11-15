@@ -24,6 +24,9 @@ import kotlin.coroutines.resumeWithException
  * a medida que cambia; esta clase traduce esos estados a [TelegramAuthState]
  * para que la UI (ya construida en Etapa 1) no tenga que cambiar.
  */
+/** TDLib no contestó a tiempo una petición (distinto de un error real de Telegram). */
+class TdLibTimeoutException(mensaje: String) : RuntimeException(mensaje)
+
 class TdLibAuthClient(
     private val contexto: Context,
     private val credenciales: CredencialesApiTelegram,
@@ -80,7 +83,31 @@ class TdLibAuthClient(
         }
     }
 
+    /**
+     * Estado de la conexión de TDLib con Telegram, en texto legible — se
+     * muestra en el registro del escaneo para saber si los "no respondió"
+     * coinciden con que TDLib estaba "Conectando..." o "Esperando red".
+     */
+    @Volatile
+    private var estadoConexionTexto: String = "desconocido"
+
+    fun estadoConexion(): String = estadoConexionTexto
+
+    /** `true` si TDLib ya está conectado y al día con Telegram. */
+    fun conexionLista(): Boolean = estadoConexionTexto == "conectado"
+
     private fun manejarActualizacion(objeto: TdApi.Object) {
+        if (objeto is TdApi.UpdateConnectionState) {
+            estadoConexionTexto = when (objeto.state) {
+                is TdApi.ConnectionStateReady -> "conectado"
+                is TdApi.ConnectionStateWaitingForNetwork -> "esperando red"
+                is TdApi.ConnectionStateConnectingToProxy -> "conectando al proxy"
+                is TdApi.ConnectionStateConnecting -> "conectando"
+                is TdApi.ConnectionStateUpdating -> "actualizando"
+                else -> "desconocido"
+            }
+            return
+        }
         val actualizacion = objeto as? TdApi.UpdateAuthorizationState ?: return
 
         val nuevoEstado = when (actualizacion.authorizationState) {
@@ -159,7 +186,7 @@ class TdLibAuthClient(
                 }
             }
         } catch (e: TimeoutCancellationException) {
-            throw RuntimeException(
+            throw TdLibTimeoutException(
                 "TDLib no respondió en ${TIMEOUT_TDLIB_MS / 1000}s a ${peticion::class.simpleName}"
             )
         }
