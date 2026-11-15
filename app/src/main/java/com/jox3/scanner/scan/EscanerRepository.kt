@@ -34,6 +34,8 @@ sealed class EventoEscaneo {
      * los contadores.
      */
     data class LogPaso(val mensaje: String) : EventoEscaneo()
+    /** Avance EN VIVO de la lectura de un chat: cuántos mensajes van leídos hasta ahora (pedido del usuario: antes solo decía "consultando"). */
+    data class Leyendo(val chatTitulo: String, val mensajesChatActual: Int) : EventoEscaneo()
     object Finalizado : EventoEscaneo()
 }
 

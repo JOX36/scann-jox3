@@ -21,6 +21,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
+import com.jox3.scanner.scan.engine.XtreamClient
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +64,16 @@ fun DetalleListaScreen(
     onEnviarTelegram: (() -> Unit)?,
 ) {
     val texto = remember(lista, detalle) { ResultadosExportador.generarContenidoDetalle(lista, detalle) }
+    val contexto = LocalContext.current
+    val cred = lista.credenciales
+    val m3uPorIp = detalle?.enlaceM3uPorIp
+        ?: lista.direccionIp?.takeIf { it.isNotBlank() }?.let { XtreamClient.enlacePorIp(cred, it) }
+
+    fun copiar(etiqueta: String, valor: String) {
+        val cm = contexto.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        cm.setPrimaryClip(ClipData.newPlainText(etiqueta, valor))
+        Toast.makeText(contexto, "$etiqueta copiado", Toast.LENGTH_SHORT).show()
+    }
 
     Column(
         modifier = Modifier
@@ -72,7 +88,7 @@ fun DetalleListaScreen(
         if (cargando) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 CircularProgressIndicator(color = AcentoApp, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                Text("Consultando el panel (canales, series, películas, servidor)...", color = TextoSecundario, fontSize = 13.sp)
+                Text("Consultando el panel (categorías y servidor)...", color = TextoSecundario, fontSize = 13.sp)
             }
             Spacer(Modifier.height(12.dp))
         } else if (detalle == null) {
@@ -87,6 +103,27 @@ fun DetalleListaScreen(
             }
             Spacer(Modifier.height(12.dp))
         }
+
+        Text("Copiar enlaces", color = TextoSecundario, fontSize = 12.sp)
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = { copiar("Enlace M3U", cred.urlOriginal) }, modifier = Modifier.weight(1f)) {
+                Text("M3U", fontSize = 13.sp)
+            }
+            OutlinedButton(onClick = { copiar("Enlace EPG", ResultadosExportador.epgLink(cred)) }, modifier = Modifier.weight(1f)) {
+                Text("EPG", fontSize = 13.sp)
+            }
+            if (m3uPorIp != null) {
+                OutlinedButton(onClick = { copiar("M3U por IP", m3uPorIp) }, modifier = Modifier.weight(1f)) {
+                    Text("Por IP", fontSize = 13.sp)
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        OutlinedButton(onClick = { copiar("Información completa", texto) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Copiar todo el texto")
+        }
+        Spacer(Modifier.height(12.dp))
 
         Surface(
             color = SuperficieApp,

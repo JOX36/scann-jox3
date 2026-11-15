@@ -168,6 +168,15 @@ object XtreamClient {
         live.await() + vod.await() + series.await()
     }
 
+    /** Categorías de TV en vivo — solo nombres de categoría, sin los miles de canales. */
+    suspend fun obtenerCategoriasLive(cred: CredencialesXtream): List<String> = obtenerCategoria(cred, "get_live_categories")
+
+    /** Categorías de películas (VOD). */
+    suspend fun obtenerCategoriasPeliculas(cred: CredencialesXtream): List<String> = obtenerCategoria(cred, "get_vod_categories")
+
+    /** Categorías de series. */
+    suspend fun obtenerCategoriasSeries(cred: CredencialesXtream): List<String> = obtenerCategoria(cred, "get_series_categories")
+
     private suspend fun obtenerCategoria(cred: CredencialesXtream, accion: String): List<String> {
         return runCatching {
             val categorias: List<Categoria> = NetworkModule.cliente.get(urlPlayerApi(cred)) {

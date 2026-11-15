@@ -91,6 +91,12 @@ sealed class EstadoFlujoEscaneo {
         // — temporal, pedido explícito del usuario para ver de principio a
         // fin qué hizo la app, sin tener que interpretar solo contadores.
         val registro: List<String> = emptyList(),
+        // Lectura en vivo (ver [EventoEscaneo.Leyendo]): chat que se está
+        // leyendo, mensajes leídos de él hasta ahora y total de los chats
+        // ya terminados — para mostrar "van N mensajes escaneados".
+        val chatLeyendo: String? = null,
+        val mensajesChatActual: Int = 0,
+        val mensajesChatsTerminados: Int = 0,
     ) : EstadoFlujoEscaneo()
 
     data class Resultados(
@@ -133,6 +139,24 @@ class ScanFlowViewModel(
     private val _detalleCargando = MutableStateFlow(false)
     val detalleCargando: StateFlow<Boolean> = _detalleCargando.asStateFlow()
     private var detalleJob: Job? = null
+
+    // Último resultado de escaneo: la pestaña "Resultados" lo muestra aunque
+    // la pestaña "Buscar" haya vuelto al menú de modos (antes ambas leían el
+    // mismo estado y los botones inferiores no llevaban a donde se tocaba).
+    private val _ultimoResultado = MutableStateFlow<EstadoFlujoEscaneo.Resultados?>(null)
+    val ultimoResultado: StateFlow<EstadoFlujoEscaneo.Resultados?> = _ultimoResultado.asStateFlow()
+
+    /** Botón "Buscar" de la barra inferior: cierra cualquier detalle y vuelve al menú de modos (salvo mientras se escanea). */
+    fun irABuscar() {
+        cerrarDetalle()
+        when (_estado.value) {
+            is EstadoFlujoEscaneo.Escaneando, EstadoFlujoEscaneo.CargandoChats -> Unit
+            else -> volverAElegirModo()
+        }
+    }
+
+    /** Botón "Resultados" de la barra inferior: cierra el detalle para mostrar la lista de resultados. */
+    fun irAResultados() = cerrarDetalle()
 
     init {
         cargarChats()
@@ -340,7 +364,9 @@ class ScanFlowViewModel(
     fun detenerYVerParciales() {
         scanJob?.cancel()
         scanJob = null
-        _estado.value = EstadoFlujoEscaneo.Resultados(encontradasActuales, erroresActuales, diagnosticoActual, registroActual)
+        val parcial = EstadoFlujoEscaneo.Resultados(encontradasActuales, erroresActuales, diagnosticoActual, registroActual)
+        _ultimoResultado.value = parcial
+        _estado.value = parcial
     }
 
     private fun procesarEvento(
@@ -352,17 +378,14 @@ class ScanFlowViewModel(
     ) {
         when (evento) {
             is EventoEscaneo.Progreso -> {
-                val estadoActual = _estado.value
-                val inicioMs = (estadoActual as? EstadoFlujoEscaneo.Escaneando)?.inicioMs
-                    ?: System.currentTimeMillis()
-                _estado.value = EstadoFlujoEscaneo.Escaneando(
-                    evento.procesados,
-                    evento.total,
-                    encontradas.toList(),
-                    errores.toList(),
-                    inicioMs,
-                    diagnostico.toList(),
-                    registro.toList(),
+                val estadoActual = _estado.value as? EstadoFlujoEscaneo.Escaneando
+                _estado.value = (estadoActual ?: EstadoFlujoEscaneo.Escaneando(0, 0, emptyList())).copy(
+                    procesados = evento.procesados,
+                    total = evento.total,
+                    encontradas = encontradas.toList(),
+                    errores = errores.toList(),
+                    diagnostico = diagnostico.toList(),
+                    registro = registro.toList(),
                 )
             }
             is EventoEscaneo.ListaEncontrada -> {
@@ -381,7 +404,23 @@ class ScanFlowViewModel(
                     _estado.value = estadoActual.copy(errores = errores.toList())
                 }
             }
+            is EventoEscaneo.Leyendo -> {
+                val estadoActual = _estado.value
+                if (estadoActual is EstadoFlujoEscaneo.Escaneando) {
+                    _estado.value = estadoActual.copy(
+                        chatLeyendo = evento.chatTitulo,
+                        mensajesChatActual = evento.mensajesChatActual,
+                    )
+                }
+            }
             is EventoEscaneo.InfoChat -> {
+                (_estado.value as? EstadoFlujoEscaneo.Escaneando)?.let {
+                    _estado.value = it.copy(
+                        chatLeyendo = null,
+                        mensajesChatActual = 0,
+                        mensajesChatsTerminados = it.mensajesChatsTerminados + evento.mensajesLeidos,
+                    )
+                }
                 diagnostico += "${evento.chatTitulo}: ${evento.mensajesLeidos} mensajes leídos, " +
                     "${evento.enlacesCandidatos} enlace(s) candidato(s)"
                 diagnosticoActual = diagnostico.toList()
@@ -400,12 +439,14 @@ class ScanFlowViewModel(
             }
             EventoEscaneo.Finalizado -> {
                 scanJob = null
-                _estado.value = EstadoFlujoEscaneo.Resultados(
+                val resultadoFinal = EstadoFlujoEscaneo.Resultados(
                     encontradas.toList(),
                     errores.toList(),
                     diagnostico.toList(),
                     registro.toList(),
                 )
+                _ultimoResultado.value = resultadoFinal
+                _estado.value = resultadoFinal
             }
         }
     }

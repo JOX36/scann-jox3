@@ -12,9 +12,10 @@ import kotlinx.coroutines.coroutineScope
  * se van a mirar).
  */
 data class DetalleLista(
-    val canales: List<String>,
-    val peliculas: List<String>,
-    val series: List<String>,
+    /** Solo NOMBRES DE CATEGORÍA (no cada canal/serie/película): resumen corto como el ejemplo del usuario. */
+    val categoriasLive: List<String>,
+    val categoriasPeliculas: List<String>,
+    val categoriasSeries: List<String>,
     val geoIp: InfoGeoIp?,
     /** La IP sobre la que se consultó [geoIp] (ya resuelta por DNS, o la IP literal del host) — `null` si no hubo ninguna disponible. */
     val ipConsultada: String?,
@@ -25,16 +26,16 @@ data class DetalleLista(
 /** Pide todo lo de [DetalleLista] en paralelo — equivalente a lo que ya hace `validarYEnriquecer` para el escaneo masivo, pero para una sola lista. */
 suspend fun consultarDetalleLista(lista: ListaValidada): DetalleLista = coroutineScope {
     val cred = lista.credenciales
-    val canalesAsync = async { XtreamClient.obtenerCanales(cred) }
-    val peliculasAsync = async { XtreamClient.obtenerNombresPeliculas(cred) }
-    val seriesAsync = async { XtreamClient.obtenerNombresSeries(cred) }
+    val liveAsync = async { XtreamClient.obtenerCategoriasLive(cred) }
+    val peliculasAsync = async { XtreamClient.obtenerCategoriasPeliculas(cred) }
+    val seriesAsync = async { XtreamClient.obtenerCategoriasSeries(cred) }
     val ip = XtreamClient.ipEfectiva(cred, lista.direccionIp)
     val geoAsync = async { ip?.let { XtreamClient.geolocalizarIp(it) } }
 
     DetalleLista(
-        canales = canalesAsync.await(),
-        peliculas = peliculasAsync.await(),
-        series = seriesAsync.await(),
+        categoriasLive = liveAsync.await(),
+        categoriasPeliculas = peliculasAsync.await(),
+        categoriasSeries = seriesAsync.await(),
         geoIp = geoAsync.await(),
         ipConsultada = ip,
         enlaceM3uPorIp = ip?.let { XtreamClient.enlacePorIp(cred, it) },

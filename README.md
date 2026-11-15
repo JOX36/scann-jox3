@@ -611,6 +611,13 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - [x] Se "abre" el chat (`OpenChat`) antes de leerlo y se cierra al
       terminar, como recomienda TDLib.
 
+## Etapa 19
+
+- **Detalle resumido**: al consultar una lista ya no se descargan miles de canales/series/películas; solo se piden las **categorías** (`get_live_categories`, `get_vod_categories`, `get_series_categories`) y se muestran como en el ejemplo (`📡 TV en vivo (N): categorías…`).
+- **Copiar enlaces**: botones M3U, EPG, Por IP y "Copiar todo el texto" en la pantalla de detalle.
+- **Botones inferiores**: "Buscar" y "Resultados" cierran el detalle y llevan de verdad a su pantalla (Buscar → menú de modos; Resultados → último resultado, que ahora se conserva aparte). El botón atrás del sistema cierra el detalle / retrocede un paso.
+- **Registro en vivo**: la pantalla de escaneo muestra "📨 N mensajes escaneados" y el chat que se está leyendo.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

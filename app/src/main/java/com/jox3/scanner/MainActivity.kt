@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -171,6 +172,19 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
 
     var pestanaActual by remember { mutableIntStateOf(Pestana.BUSCAR.ordinal) }
 
+    // Botón atrás del sistema: primero cierra el detalle, luego retrocede un
+    // paso del flujo de búsqueda; en otras pestañas vuelve a "Buscar".
+    val detalleAbierto by scanViewModel.listaDetalle.collectAsState()
+    BackHandler(enabled = detalleAbierto != null) { scanViewModel.cerrarDetalle() }
+    BackHandler(
+        enabled = detalleAbierto == null && pestanaActual == Pestana.BUSCAR.ordinal &&
+            (estadoEscaneo is EstadoFlujoEscaneo.EscribiendoHost ||
+                estadoEscaneo is EstadoFlujoEscaneo.SeleccionandoChats ||
+                estadoEscaneo is EstadoFlujoEscaneo.EligiendoChatUnico ||
+                estadoEscaneo is EstadoFlujoEscaneo.EligiendoTemas),
+    ) { scanViewModel.volver() }
+    BackHandler(enabled = pestanaActual != Pestana.BUSCAR.ordinal) { pestanaActual = Pestana.BUSCAR.ordinal }
+
     Scaffold(
         containerColor = Color.Transparent,
         bottomBar = {
@@ -182,7 +196,16 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
                 Pestana.entries.forEachIndexed { indice, pestana ->
                     NavigationBarItem(
                         selected = pestanaActual == indice,
-                        onClick = { pestanaActual = indice },
+                        onClick = {
+                            // Cerrar cualquier detalle/paso intermedio para que el botón
+                            // lleve de verdad a la pestaña tocada (antes había que usar "atrás").
+                            when (Pestana.entries[indice]) {
+                                Pestana.BUSCAR -> scanViewModel.irABuscar()
+                                Pestana.RESULTADOS -> scanViewModel.irAResultados()
+                                Pestana.AJUSTES -> Unit
+                            }
+                            pestanaActual = indice
+                        },
                         icon = { Text(pestana.icono) },
                         label = { Text(pestana.etiqueta) },
                         colors = NavigationBarItemDefaults.colors(
@@ -231,8 +254,11 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
 private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewModel) {
     val contexto = LocalContext.current
     val listaDetalle by viewModel.listaDetalle.collectAsState()
-    when (estado) {
+    val ultimo by viewModel.ultimoResultado.collectAsState()
+    val mostrar: EstadoFlujoEscaneo = if (estado is EstadoFlujoEscaneo.Escaneando) estado else (ultimo ?: estado)
+    when (mostrar) {
         is EstadoFlujoEscaneo.Resultados -> {
+            val estado = mostrar
             val listaElegida = listaDetalle
             if (listaElegida != null) {
                 val detalleInfo by viewModel.detalleInfo.collectAsState()
@@ -257,6 +283,7 @@ private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlo
             }
         }
         is EstadoFlujoEscaneo.Escaneando -> {
+            val estado = mostrar
             ScanProgressScreen(
                 procesados = estado.procesados,
                 total = estado.total,
@@ -265,6 +292,9 @@ private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlo
                 diagnostico = estado.diagnostico,
                 registro = estado.registro,
                 inicioMs = estado.inicioMs,
+                chatLeyendo = estado.chatLeyendo,
+                mensajesChatActual = estado.mensajesChatActual,
+                mensajesTotales = estado.mensajesChatsTerminados,
                 onDetener = viewModel::detenerYVerParciales,
                 onCompartirRegistro = { compartirRegistro(contexto, estado.errores, estado.diagnostico, estado.registro) },
             )
@@ -377,6 +407,9 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                 diagnostico = s.diagnostico,
                 registro = s.registro,
                 inicioMs = s.inicioMs,
+                chatLeyendo = s.chatLeyendo,
+                mensajesChatActual = s.mensajesChatActual,
+                mensajesTotales = s.mensajesChatsTerminados,
                 onDetener = viewModel::detenerYVerParciales,
                 onCompartirRegistro = { compartirRegistro(contexto, s.errores, s.diagnostico, s.registro) },
             )

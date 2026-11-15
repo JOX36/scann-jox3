@@ -63,8 +63,14 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
             // TDLib recomienda "abrir" el chat antes de leerlo: ayuda a que
             // sincronice su estado y responda el historial.
             runCatching { sesion.enviarYEsperar(TdApi.OpenChat(chat.id)) }
+            var leidosEnChat = 0
+            send(EventoEscaneo.Leyendo(chat.titulo, 0))
+            val reportarLectura: suspend (Int) -> Unit = { n ->
+                leidosEnChat += n
+                send(EventoEscaneo.Leyendo(chat.titulo, leidosEnChat))
+            }
             val mensajes = try {
-                obtenerMensajesRecientes(chat.id, chat.titulo, registrar, temaIds = chat.temaIds)
+                obtenerMensajesRecientes(chat.id, chat.titulo, registrar, reportarLectura, temaIds = chat.temaIds)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -177,6 +183,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         chatId: Long,
         chatTitulo: String,
         registrar: suspend (String) -> Unit,
+        leido: suspend (Int) -> Unit = {},
         limite: Int = LIMITE_MENSAJES,
         temaIds: Set<Int>? = null,
     ): List<TdApi.Message> {
@@ -187,7 +194,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
             val elegidos = mutableListOf<TdApi.Message>()
             for (temaId in temaIds) {
                 try {
-                    val delTema = obtenerMensajesDeTema(chatId, temaId, limite, registrar)
+                    val delTema = obtenerMensajesDeTema(chatId, temaId, limite, registrar, leido)
                     registrar("   tema $temaId: ${delTema.size} mensaje(s)")
                     elegidos += delTema
                 } catch (e: CancellationException) {
@@ -215,7 +222,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
             // principio.
             var mensajesDeForo: List<TdApi.Message> = emptyList()
             try {
-                mensajesDeForo = obtenerMensajesDeForo(chatId, limite, registrar)
+                mensajesDeForo = obtenerMensajesDeForo(chatId, limite, registrar, leido)
                 if (mensajesDeForo.isEmpty()) {
                     registrar("   lectura por Temas no trajo mensajes → probando historial normal...")
                 }
@@ -228,7 +235,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         } else {
             registrar("   leyendo historial normal...")
         }
-        return obtenerMensajesDeHistorialNormal(chatId, limite, registrar)
+        return obtenerMensajesDeHistorialNormal(chatId, limite, registrar, leido)
     }
 
     /** `true` si el chat es un supergrupo con "Temas" (forum topics) activado. */
@@ -266,6 +273,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         chatId: Long,
         limite: Int,
         registrar: suspend (String) -> Unit,
+        leido: suspend (Int) -> Unit,
     ): List<TdApi.Message> {
         val mensajes = mutableListOf<TdApi.Message>()
         var fromMessageId = 0L
@@ -298,6 +306,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
             intentosVacios = 0
             mensajes += lote
             fromMessageId = lote.last().id
+            leido(lote.size)
             delay(PAUSA_ENTRE_PAGINAS_MS)
         }
 
@@ -326,6 +335,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         chatId: Long,
         limitePorTema: Int,
         registrar: suspend (String) -> Unit,
+        leido: suspend (Int) -> Unit,
     ): List<TdApi.Message> {
         // Si esta llamada falla, se deja propagar sin atrapar — quien llama
         // ([obtenerMensajesRecientes]) ya sabe convertirlo en el mensaje de
@@ -336,7 +346,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         val mensajes = mutableListOf<TdApi.Message>()
         for (temaId in ids) {
             try {
-                val mensajesDelTema = obtenerMensajesDeTema(chatId, temaId, limitePorTema, registrar)
+                val mensajesDelTema = obtenerMensajesDeTema(chatId, temaId, limitePorTema, registrar, leido)
                 registrar("   tema $temaId: ${mensajesDelTema.size} mensaje(s)")
                 mensajes += mensajesDelTema
             } catch (e: CancellationException) {
@@ -382,6 +392,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         temaId: Int,
         limite: Int,
         registrar: suspend (String) -> Unit,
+        leido: suspend (Int) -> Unit,
     ): List<TdApi.Message> {
         val mensajes = mutableListOf<TdApi.Message>()
         var fromMessageId = 0L
@@ -408,6 +419,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
             intentosVacios = 0
             mensajes += lote
             fromMessageId = lote.last().id
+            leido(lote.size)
             delay(PAUSA_ENTRE_PAGINAS_MS)
         }
 

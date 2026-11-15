@@ -34,7 +34,7 @@ object ResultadosExportador {
         else -> "🟢"
     }
 
-    private fun epgLink(cred: CredencialesXtream): String =
+    fun epgLink(cred: CredencialesXtream): String =
         "${cred.host}/xmltv.php?username=${cred.username}&password=${cred.password}"
 
     private fun conexionesTexto(lista: ListaValidada): String =
@@ -145,11 +145,11 @@ object ResultadosExportador {
         }
         builder.appendLine()
         if (detalle != null) {
-            builder.appendLine("📡 TV en vivo (${detalle.canales.size}): ${detalle.canales.joinToString(", ")}")
+            builder.appendLine("📡 TV en vivo (${detalle.categoriasLive.size}): ${detalle.categoriasLive.joinToString(", ")}")
             builder.appendLine()
-            builder.appendLine("🎬 Series (${detalle.series.size}): ${detalle.series.joinToString(", ")}")
+            builder.appendLine("🎬 Series (${detalle.categoriasSeries.size}): ${detalle.categoriasSeries.joinToString(", ")}")
             builder.appendLine()
-            builder.appendLine("🎥 Películas (${detalle.peliculas.size}): ${detalle.peliculas.joinToString(", ")}")
+            builder.appendLine("🎥 Películas (${detalle.categoriasPeliculas.size}): ${detalle.categoriasPeliculas.joinToString(", ")}")
             builder.appendLine()
         }
         builder.appendLine("📂 Encontrada en: ${lista.origenChat}")

@@ -50,6 +50,9 @@ fun ScanProgressScreen(
     diagnostico: List<String> = emptyList(),
     registro: List<String> = emptyList(),
     inicioMs: Long = System.currentTimeMillis(),
+    chatLeyendo: String? = null,
+    mensajesChatActual: Int = 0,
+    mensajesTotales: Int = 0,
     onDetener: (() -> Unit)? = null,
     onCompartirRegistro: (() -> Unit)? = null,
 ) {
@@ -80,6 +83,18 @@ fun ScanProgressScreen(
             color = TextoSecundario,
             fontSize = 13.sp,
         )
+
+        if (chatLeyendo != null || mensajesTotales > 0) {
+            Spacer(Modifier.height(6.dp))
+            val acumulado = mensajesTotales + mensajesChatActual
+            Text(
+                "📨 $acumulado mensajes escaneados" +
+                    (chatLeyendo?.let { " · leyendo \"$it\": $mensajesChatActual" } ?: ""),
+                color = AcentoApp,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
 
         if (errores.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
