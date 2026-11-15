@@ -3,7 +3,7 @@
     <!--
         Expone la subcarpeta donde DescargadorActualizacion guarda el .apk
         descargado, para que FileProvider pueda compartirla con el
-        instalador del sistema (ver UpdateDownloadReceiver).
+        instalador del sistema (ver DescargadorActualizacion.intentInstalar).
     -->
     <external-files-path
         name="actualizaciones"

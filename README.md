@@ -571,6 +571,24 @@ maqueta de muestra.
       al abrir (con "Reintentar" si falla). Guardar/Enviar siguen siendo
       botones propios de esa lista: mirar no envía nada.
 
+## Etapa 17: actualización con instalador automático y progreso visible
+
+Visto en una grabación del usuario: al tocar "Actualizar ahora" la app
+no mostraba el avance (solo un spinner casi invisible), había que bajar
+las notificaciones para ver el %, y al terminar el instalador no se abría
+solo: había que ir a Descargas y tocar el archivo.
+
+- [x] Barra de progreso con porcentaje en Ajustes (y en el banner),
+      consultando el `DownloadManager` desde el `UpdateViewModel`.
+- [x] Al terminar la descarga, la app abre sola el instalador del
+      sistema (desde `MainActivity`, en primer plano; si estaba en
+      segundo plano, apenas el usuario vuelve). Antes lo intentaba un
+      `BroadcastReceiver`, que Android 10+ no deja abrir pantallas desde
+      el fondo — se eliminó (`UpdateDownloadReceiver`).
+- [x] Botón "Instalar ahora" de respaldo y "Reintentar descarga" si falla.
+- Siguen siendo del sistema (la app no puede saltarlos): confirmar
+  "¿Deseas actualizar esta app?" y el aviso de Play Protect.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

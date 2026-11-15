@@ -34,6 +34,7 @@ fun UpdateBanner(
     estado: EstadoActualizacion,
     onActualizar: (InfoActualizacion) -> Unit,
     onAbrirAjustesPermiso: (InfoActualizacion) -> Unit,
+    onInstalar: () -> Unit = {},
 ) {
     when (estado) {
         is EstadoActualizacion.Disponible -> {
@@ -60,7 +61,21 @@ fun UpdateBanner(
             BannerBase {
                 CircularProgressIndicator(color = AcentoApp, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 EspacioHorizontal()
-                Text("Descargando actualización...", fontSize = 13.sp)
+                Text("Descargando actualización${estado.porcentaje?.let { " · $it%" } ?: "..."}", fontSize = 13.sp)
+            }
+        }
+
+        is EstadoActualizacion.ListoParaInstalar -> {
+            BannerBase {
+                Text("Descarga lista", fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Button(onClick = onInstalar) { Text("Instalar ahora") }
+            }
+        }
+
+        is EstadoActualizacion.ErrorDescarga -> {
+            BannerBase {
+                Text("No se pudo descargar", fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Button(onClick = { onActualizar(estado.info) }) { Text("Reintentar") }
             }
         }
 

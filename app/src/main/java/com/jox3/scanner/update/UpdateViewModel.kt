@@ -3,6 +3,8 @@ package com.jox3.scanner.update
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,13 +17,16 @@ sealed class EstadoActualizacion {
     object AlDia : EstadoActualizacion()
     data class Disponible(val info: InfoActualizacion) : EstadoActualizacion()
     data class PermisoRequerido(val info: InfoActualizacion) : EstadoActualizacion()
-    data class Descargando(val info: InfoActualizacion) : EstadoActualizacion()
+    data class Descargando(val info: InfoActualizacion, val porcentaje: Int? = null) : EstadoActualizacion()
+    /** Descarga terminada; [lanzado] pasa a `true` cuando ya se abrió el instalador (para no repetirlo). */
+    data class ListoParaInstalar(val info: InfoActualizacion, val lanzado: Boolean = false) : EstadoActualizacion()
+    data class ErrorDescarga(val info: InfoActualizacion) : EstadoActualizacion()
 }
 
 /**
  * Orquesta la comprobación de actualizaciones contra GitHub Releases y la
  * descarga a través de [DescargadorActualizacion]. La instalación en sí
- * ocurre fuera de este ViewModel: la completa [UpdateDownloadReceiver]
+ * ocurre fuera de este ViewModel: la lanza la propia pantalla (MainActivity) al detectar que terminó
  * cuando el sistema avisa que la descarga terminó.
  */
 class UpdateViewModel(application: Application) : AndroidViewModel(application) {
@@ -58,8 +63,41 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
             _estado.value = EstadoActualizacion.PermisoRequerido(info)
             return
         }
-        descargador.encolarDescarga(info.urlDescargaApk, info.version)
-        _estado.value = EstadoActualizacion.Descargando(info)
+        val id = descargador.encolarDescarga(info.urlDescargaApk, info.version)
+        _estado.value = EstadoActualizacion.Descargando(info, 0)
+        // Se sigue el avance desde la propia app (porcentaje visible) y, al
+        // terminar, la UI abre el instalador sola — antes había que ir a las
+        // notificaciones / Descargas a tocar el archivo a mano.
+        jobDescarga?.cancel()
+        jobDescarga = viewModelScope.launch {
+            while (true) {
+                val progreso = descargador.consultarProgreso(id)
+                when (progreso?.estado) {
+                    ProgresoDescarga.Estado.COMPLETA -> {
+                        _estado.value = EstadoActualizacion.ListoParaInstalar(info)
+                        return@launch
+                    }
+                    null, ProgresoDescarga.Estado.FALLIDA -> {
+                        _estado.value = EstadoActualizacion.ErrorDescarga(info)
+                        return@launch
+                    }
+                    ProgresoDescarga.Estado.EN_CURSO ->
+                        _estado.value = EstadoActualizacion.Descargando(info, progreso.porcentaje)
+                }
+                delay(500)
+            }
+        }
+    }
+
+    private var jobDescarga: Job? = null
+
+    /** Intent del instalador del sistema para el .apk descargado (ver [DescargadorActualizacion.intentInstalar]). */
+    fun intentInstalar() = descargador.intentInstalar()
+
+    /** La UI ya abrió el instalador: se marca para no volver a abrirlo en cada regreso a la app. */
+    fun instaladorLanzado() {
+        val actual = _estado.value
+        if (actual is EstadoActualizacion.ListoParaInstalar) _estado.value = actual.copy(lanzado = true)
     }
 
     /** Llamada al volver de la pantalla de ajustes de permiso. */

@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jox3.scanner.results.ResultadosExportador
 import com.jox3.scanner.scan.EstadoFlujoEscaneo
@@ -71,6 +73,7 @@ import com.jox3.scanner.ui.theme.ScannJox3Theme
 import com.jox3.scanner.ui.theme.SuperficieFuerteApp
 import com.jox3.scanner.ui.theme.TextoTerciarioApp
 import com.jox3.scanner.BuildConfig
+import com.jox3.scanner.update.EstadoActualizacion
 import com.jox3.scanner.update.InfoActualizacion
 import com.jox3.scanner.update.UpdateViewModel
 import kotlinx.coroutines.launch
@@ -151,6 +154,21 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
         updateViewModel.comprobarActualizacion(versionInstalada = BuildConfig.VERSION_NAME)
     }
 
+    // Al terminar la descarga, abre el instalador del sistema solo — desde
+    // la propia app en primer plano (un receiver en segundo plano no puede
+    // en Android 10+). Si la app estaba en segundo plano al terminar, se
+    // abre en cuanto el usuario vuelve a ella. Una sola vez por descarga.
+    val actividad = LocalContext.current as? ComponentActivity
+    LaunchedEffect(estadoActualizacion) {
+        val estadoActual = estadoActualizacion
+        if (actividad != null && estadoActual is EstadoActualizacion.ListoParaInstalar && !estadoActual.lanzado) {
+            actividad.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                updateViewModel.intentInstalar()?.let { actividad.startActivity(it) }
+                updateViewModel.instaladorLanzado()
+            }
+        }
+    }
+
     var pestanaActual by remember { mutableIntStateOf(Pestana.BUSCAR.ordinal) }
 
     Scaffold(
@@ -193,6 +211,7 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
                             updateViewModel.comprobarActualizacion(versionInstalada = BuildConfig.VERSION_NAME)
                         },
                         onActualizar = { info -> updateViewModel.iniciarDescarga(info) },
+                        onInstalar = { updateViewModel.intentInstalar()?.let { contexto.startActivity(it) } },
                         onAbrirAjustesPermiso = { info ->
                             infoPendientePermiso = info
                             lanzadorAjustesPermiso.launch(updateViewModel.intentSolicitarPermiso())

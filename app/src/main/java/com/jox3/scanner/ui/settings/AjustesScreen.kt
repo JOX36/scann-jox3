@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,6 +44,7 @@ fun AjustesScreen(
     onComprobarActualizacion: () -> Unit,
     onActualizar: (com.jox3.scanner.update.InfoActualizacion) -> Unit,
     onAbrirAjustesPermiso: (com.jox3.scanner.update.InfoActualizacion) -> Unit,
+    onInstalar: () -> Unit = {},
     botTokenGuardado: String? = null,
     chatIdGuardado: String? = null,
     onGuardarBot: ((String, String) -> Unit)? = null,
@@ -93,9 +95,35 @@ fun AjustesScreen(
                 }
             }
             is EstadoActualizacion.Descargando -> {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(color = AcentoApp, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Text(" Descargando actualización...", fontSize = 13.sp)
+                Column {
+                    Text(
+                        "Descargando actualización${estado.porcentaje?.let { " · $it%" } ?: "..."}",
+                        fontSize = 13.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    if (estado.porcentaje != null) {
+                        LinearProgressIndicator(
+                            progress = { estado.porcentaje / 100f },
+                            color = AcentoApp,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
+                        LinearProgressIndicator(color = AcentoApp, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+            is EstadoActualizacion.ListoParaInstalar -> {
+                Column {
+                    Text("Descarga lista. Confirma la instalación en la pantalla del sistema.", fontSize = 13.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = onInstalar) { Text("Instalar ahora") }
+                }
+            }
+            is EstadoActualizacion.ErrorDescarga -> {
+                Column {
+                    Text("No se pudo descargar la actualización.", fontSize = 13.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = { onActualizar(estado.info) }) { Text("Reintentar descarga") }
                 }
             }
             EstadoActualizacion.SinComprobar -> {
