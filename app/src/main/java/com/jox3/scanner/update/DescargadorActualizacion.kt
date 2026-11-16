@@ -58,6 +58,11 @@ class DescargadorActualizacion(private val contexto: Context) {
      * corresponde a esta descarga y no a otra en curso en el dispositivo.
      */
     fun encolarDescarga(urlApk: String, version: String): Long {
+        // El DownloadManager NO sobreescribe un archivo con el mismo nombre:
+        // lo guarda como "...-1.apk". Entonces [intentInstalar] abría el .apk
+        // VIEJO (de una descarga anterior, a veces incompleta) y el sistema
+        // decía "el paquete no es válido". Se borra lo anterior antes de bajar.
+        borrarDescargasPrevias()
         val manager = contexto.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
         val solicitud = DownloadManager.Request(Uri.parse(urlApk))
@@ -73,6 +78,17 @@ class DescargadorActualizacion(private val contexto: Context) {
             .setMimeType("application/vnd.android.package-archive")
 
         return manager.enqueue(solicitud)
+    }
+
+    private fun borrarDescargasPrevias() {
+        contexto.getExternalFilesDir(Build.VERSION.RELEASE)?.listFiles()?.forEach { runCatching { it.delete() } }
+    }
+
+    /** `true` si el .apk descargado existe y Android lo puede leer como paquete (no está corrupto ni incompleto). */
+    fun apkDescargadoEsValido(): Boolean {
+        val archivo = File(contexto.getExternalFilesDir(Build.VERSION.RELEASE), NOMBRE_APK_DESCARGADO)
+        if (!archivo.exists() || archivo.length() == 0L) return false
+        return contexto.packageManager.getPackageArchiveInfo(archivo.absolutePath, 0) != null
     }
 
     /** Consulta el avance de la descarga [id]; `null` si el sistema ya no la conoce (cancelada/borrada). */

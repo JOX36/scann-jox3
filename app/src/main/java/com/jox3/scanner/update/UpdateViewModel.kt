@@ -74,7 +74,13 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
                 val progreso = descargador.consultarProgreso(id)
                 when (progreso?.estado) {
                     ProgresoDescarga.Estado.COMPLETA -> {
-                        _estado.value = EstadoActualizacion.ListoParaInstalar(info)
+                        // Si el archivo no es un .apk legible, se avisa como error de descarga
+                        // (con "Reintentar") en vez de abrir un instalador que fallará.
+                        _estado.value = if (descargador.apkDescargadoEsValido()) {
+                            EstadoActualizacion.ListoParaInstalar(info)
+                        } else {
+                            EstadoActualizacion.ErrorDescarga(info)
+                        }
                         return@launch
                     }
                     null, ProgresoDescarga.Estado.FALLIDA -> {

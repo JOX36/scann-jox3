@@ -625,6 +625,10 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - La hora de "Escaneado" ahora es la local del teléfono (antes salía en UTC).
 - Etapa 20b: "Creado" y "Vencimiento" también se muestran en la hora local del teléfono (antes UTC). Los días restantes no cambian.
 
+## Etapa 21
+
+- **Actualización desde la app: "el paquete no es válido"**. Causa probable: el DownloadManager no sobreescribe un archivo existente (guarda `...-1.apk`), así que la app abría el `.apk` viejo de una descarga anterior. Ahora se borran las descargas previas antes de bajar y, al terminar, se comprueba que el `.apk` sea legible (`getPackageArchiveInfo`); si no, sale "Reintentar" en vez de abrir un instalador que falla.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
