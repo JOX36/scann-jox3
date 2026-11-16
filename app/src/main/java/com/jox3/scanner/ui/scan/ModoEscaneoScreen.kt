@@ -55,11 +55,11 @@ fun ModoEscaneoScreen(onModoElegido: (TipoModo) -> Unit) {
         Spacer(Modifier.height(20.dp))
 
         OpcionModo(
-            icono = "🔎",
+            icono = "🌎",
             destacado = true,
-            titulo = "Cualquier lista",
-            descripcion = "Elige uno o varios chats y busca cualquier lista en ellos.",
-            onClick = { onModoElegido(TipoModo.CUALQUIER_LISTA) },
+            titulo = "Contenido LATINO en varios chats",
+            descripcion = "Elige uno o varios grupos, canales o chats y se queda solo con listas activas de Latinoamérica.",
+            onClick = { onModoElegido(TipoModo.LATINO_EN_VARIOS_CHATS) },
         )
         OpcionModo(
             icono = "🌐",
@@ -74,7 +74,7 @@ fun ModoEscaneoScreen(onModoElegido: (TipoModo) -> Unit) {
             onClick = { onModoElegido(TipoModo.HOST_EN_UN_CHAT) },
         )
         OpcionModo(
-            icono = "🌎",
+            icono = "📍",
             titulo = "Solo contenido LATINO en un chat",
             descripcion = "Elige un chat y se queda solo con las listas activas de contenido latino.",
             onClick = { onModoElegido(TipoModo.LATINO_EN_UN_CHAT) },

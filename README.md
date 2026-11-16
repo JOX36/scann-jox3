@@ -94,8 +94,8 @@ el teléfono y no se vuelven a pedir.
       original (que tenía 5 opciones antes de escanear). Antes la app iba
       directo de "elegir chats" a "escanear todo"; ahora primero se elige el
       modo:
-      1. **Cualquier lista**: el flujo de siempre (elegir uno o varios chats
-         y escanear todo lo que haya).
+      1. **Cualquier lista** *(eliminada en la Etapa 22; ahora es "Contenido
+         LATINO en varios chats")*: elegir uno o varios chats y escanear.
       2. **Buscar un host en todos los chats**: escribe un host/dominio y lo
          busca en todos tus chats, sin elegir uno a uno.
       3. **Buscar un host en un chat específico**: escribe un host y elige un
@@ -628,6 +628,13 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 ## Etapa 21
 
 - **Actualización desde la app: "el paquete no es válido"**. Causa probable: el DownloadManager no sobreescribe un archivo existente (guarda `...-1.apk`), así que la app abría el `.apk` viejo de una descarga anterior. Ahora se borran las descargas previas antes de bajar y, al terminar, se comprueba que el `.apk` sea legible (`getPackageArchiveInfo`); si no, sale "Reintentar" en vez de abrir un instalador que falla.
+
+## Etapa 22
+
+- **Detector LATAM corregido**: antes palabras genéricas en español (DEPORTES, NOTICIAS, CINE…) bastaban para pasar el umbral, así que un panel de España (Movistar, LaLiga…) salía como "LATAM 23 %" y casi todo daba LATAM. Ahora solo cuentan señales latinas reales (países, LATINO/LATAM, novelas, cadenas como Caracol/RCN/Televisa…), se compara por palabra completa y sin tildes (INTERNACIONAL ya no cuenta como NACIONAL), y los paneles de España se marcan aparte (🇪🇸).
+- **Modos**: se elimina "Cualquier lista"; nuevo modo **"Contenido LATINO en varios chats"** (elegir varios grupos, canales o chats; solo se quedan las listas activas LATAM).
+- **IP alternativa**: solo IPv4 y se omite si es de Cloudflare (antes salía una IPv6 sin corchetes, enlace inválido, y la IP de un proxy).
+- Pendiente de decidir: opción "cualquier español" (incluir también España) como interruptor.
 
 ## Nota sobre el CI
 

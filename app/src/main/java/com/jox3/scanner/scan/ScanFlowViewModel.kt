@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
  * `escanear_archivo_local_latino`).
  */
 enum class TipoModo {
-    CUALQUIER_LISTA,
+    LATINO_EN_VARIOS_CHATS,
     HOST_EN_TODOS_LOS_CHATS,
     HOST_EN_UN_CHAT,
     LATINO_EN_UN_CHAT,
@@ -56,6 +56,8 @@ sealed class EstadoFlujoEscaneo {
     data class SeleccionandoChats(
         val chats: List<ChatTelegram>,
         val seleccionados: Set<Long>,
+        /** `true` cuando se llegó desde "Contenido LATINO en varios chats": solo se quedan listas LATAM. */
+        val soloLatino: Boolean = false,
     ) : EstadoFlujoEscaneo()
 
     /** Comprobando si algún chat elegido es un grupo con "Temas" antes de escanear. */
@@ -177,8 +179,8 @@ class ScanFlowViewModel(
      */
     fun elegirModo(modo: TipoModo) {
         when (modo) {
-            TipoModo.CUALQUIER_LISTA ->
-                _estado.value = EstadoFlujoEscaneo.SeleccionandoChats(chatsCache, emptySet())
+            TipoModo.LATINO_EN_VARIOS_CHATS ->
+                _estado.value = EstadoFlujoEscaneo.SeleccionandoChats(chatsCache, emptySet(), soloLatino = true)
             TipoModo.HOST_EN_TODOS_LOS_CHATS, TipoModo.HOST_EN_UN_CHAT ->
                 _estado.value = EstadoFlujoEscaneo.EscribiendoHost(chatsCache, modo)
             TipoModo.LATINO_EN_UN_CHAT ->
@@ -254,7 +256,7 @@ class ScanFlowViewModel(
         val actual = _estado.value
         if (actual !is EstadoFlujoEscaneo.SeleccionandoChats || actual.seleccionados.isEmpty()) return
         val chatsElegidos = actual.chats.filter { it.id in actual.seleccionados }
-        prepararEscaneo(chatsElegidos, filtroHost = null, soloLatino = false)
+        prepararEscaneo(chatsElegidos, filtroHost = null, soloLatino = actual.soloLatino)
     }
 
     /**

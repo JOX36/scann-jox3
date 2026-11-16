@@ -424,6 +424,7 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                 onAlternarSeleccion = viewModel::alternarSeleccion,
                 onEscanear = viewModel::iniciarEscaneoDeSeleccionados,
                 onVolver = viewModel::volver,
+                soloLatino = s.soloLatino,
             )
         }
 

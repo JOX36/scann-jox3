@@ -84,7 +84,7 @@ object ResultadosExportador {
             builder.appendLine("🕒 Timezone: ${lista.zonaHoraria ?: "N/A"}${if (banderaTz.isNotEmpty()) " $banderaTz" else ""}")
             builder.appendLine("🧪 Prueba: ${if (lista.esPrueba) "Sí" else "No"}")
             builder.appendLine("🎞️ Formatos: ${lista.formatos ?: "N/A"}")
-            builder.appendLine("🌎 Contenido LATAM: ${porcentajeLatamTexto(lista)}% de las categorías")
+            builder.appendLine("🌎 Contenido LATAM: ${porcentajeLatamTexto(lista)}% de las categorías${if (lista.esEspana) " · 🇪🇸 contenido de España" else ""}")
             builder.appendLine("📺 Canales: ${lista.cantidadCanales ?: "N/A"}")
             builder.appendLine("🎬 Series: ${lista.cantidadSeries ?: "N/A"}")
             builder.appendLine("🎥 Películas: ${lista.cantidadPeliculas ?: "N/A"}")

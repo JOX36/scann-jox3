@@ -1,50 +1,78 @@
 package com.jox3.scanner.scan.engine
 
+import java.text.Normalizer
+
 /**
- * Puerto del detector de contenido latino del script de Python
- * (`es_contenido_latino` / `LATIN_KEYWORDS` / `UMBRAL_CONTENIDO_LATINO`),
- * con la misma historia de ajustes: ya no se usa la zona horaria del
- * servidor (un server en Europa puede tener contenido 100% latino), y el
- * umbral quedó bajo (12%, no 50%) porque los nombres de categoría de un
- * panel Xtream suelen mezclar géneros en inglés aunque el contenido sea
- * mayormente latino.
+ * Detector de contenido LATINO. Antes (heredado del script de Python) mezclaba
+ * "está en español" con "es de Latinoamérica": palabras genéricas como
+ * DEPORTES, NOTICIAS o CINE bastaban para pasar el umbral, así que un panel de
+ * España (Movistar, LaLiga, Orange…) salía como "LATAM 23 %". Ahora:
+ *
+ * - **Señales fuertes** ([PALABRAS_LATAM]): países latinoamericanos, "LATINO",
+ *   "LATAM", telenovelas y cadenas latinas conocidas. SOLO estas cuentan para
+ *   el porcentaje LATAM.
+ * - **Señales de España** ([PALABRAS_ESPANA]): prefijo "ES |", Movistar, LaLiga,
+ *   Rakuten, Tivify… Sirven para marcar el panel como "España".
+ * - Las palabras genéricas en español ya no cuentan.
+ * - Se compara por PALABRA COMPLETA, sin tildes ("INTERNACIONAL" ya no cuenta
+ *   como "NACIONAL", "CINEMAX" no cuenta como "CINE").
  */
-private val PALABRAS_CLAVE_LATINAS: Set<String> = setOf(
+private val PALABRAS_LATAM: List<String> = listOf(
     // Región / idioma
-    "LATINO", "LATINA", "LATINOAMERICA", "LATAM", "HISPANO", "ESPAÑOL", "ESPANOL",
+    "LATINO", "LATINOS", "LATINA", "LATINAS", "LATINOAMERICA", "LATAM", "HISPANOAMERICA",
     // Países
-    "MEXICO", "MÉXICO", "COLOMBIA", "ARGENTINA", "CHILE", "PERU", "PERÚ", "VENEZUELA",
-    "ECUADOR", "BOLIVIA", "PARAGUAY", "URUGUAY", "PANAMA", "PANAMÁ", "COSTA RICA",
-    "GUATEMALA", "HONDURAS", "EL SALVADOR", "NICARAGUA", "REPUBLICA DOMINICANA",
-    "REPÚBLICA DOMINICANA", "CUBA", "PUERTO RICO", "BRASIL", "BRAZIL",
-    // Géneros genéricos en español (frecuentes en categorías de paneles latinos)
-    "DEPORTES", "NOTICIAS", "PELICULAS", "PELÍCULAS", "NOVELAS", "INFANTIL",
-    "ANIMADOS", "ENTRETENIMIENTO", "MUSICA", "MÚSICA", "DOCUMENTALES", "VARIEDAD",
-    "NACIONAL", "RELIGIOSO", "EVENTOS", "CINE",
-    // Canales / cadenas latinoamericanas conocidas
-    "CARACOL", "RCN", "TELEMUNDO", "UNIVISION", "UNIVISIÓN", "AZTECA", "TELEVISA",
-    "WILLAX", "CHILEVISION", "CHILEVISIÓN", "TELEFE", "GLOBO", "SBT", "RECORD",
-    "ESPN SUR", "FOX SPORTS MX", "HBO LATINO", "CINECANAL", "TLNOVELAS", "DE PELICULA",
+    "MEXICO", "COLOMBIA", "ARGENTINA", "CHILE", "PERU", "VENEZUELA", "ECUADOR", "BOLIVIA",
+    "PARAGUAY", "URUGUAY", "PANAMA", "COSTA RICA", "GUATEMALA", "HONDURAS", "EL SALVADOR",
+    "NICARAGUA", "REPUBLICA DOMINICANA", "CUBA", "PUERTO RICO", "BRASIL", "BRAZIL",
+    // Contenido típicamente latino
+    "NOVELAS", "TELENOVELAS", "TLNOVELAS", "CANTINFLAS",
+    // Cadenas / canales latinoamericanos conocidos
+    "CARACOL", "RCN", "TELEMUNDO", "UNIVISION", "AZTECA", "TELEVISA", "LAS ESTRELLAS",
+    "WILLAX", "CHILEVISION", "TELEFE", "GLOBO", "SBT", "ESPN SUR", "FOX SPORTS MX",
+    "HBO LATINO", "CINECANAL", "DE PELICULA", "WIN SPORTS", "SENAL COLOMBIA",
+    "CANAL TRECE", "AMERICA TV", "ATV", "PANAMERICANA", "VENEVISION", "TELEVEN",
+)
+
+private val PALABRAS_ESPANA: List<String> = listOf(
+    "ESPANA", "ES", "MOVISTAR", "ORANGE", "LALIGA", "RAKUTEN", "TIVIFY", "VODAFONE",
+    "ANTENA 3", "TELECINCO", "LA SEXTA", "TVE", "AUTONOMICOS", "ZAPI", "AVATEL",
 )
 
 const val UMBRAL_CONTENIDO_LATINO = 0.12
 
-/**
- * Evalúa una lista de textos (nombres de categoría, o nombres de canal como
- * respaldo) y decide si el panel es mayormente contenido latino.
- *
- * Devuelve `(esLatino, proporcion)` — se guarda el porcentaje real (no solo
- * el booleano) para poder mostrarlo en los resultados, igual que
- * `latino_pct` en el script de Python.
- */
-fun esContenidoLatino(textos: List<String>): Pair<Boolean, Double> {
-    if (textos.isEmpty()) return false to 0.0
-
-    val coincidencias = textos.count { texto ->
-        val normalizado = texto.uppercase()
-        PALABRAS_CLAVE_LATINAS.any { palabra -> normalizado.contains(palabra) }
-    }
-
-    val proporcion = coincidencias.toDouble() / textos.size
-    return (proporcion >= UMBRAL_CONTENIDO_LATINO) to proporcion
+/** Mayúsculas, sin tildes y con todo lo que no sea letra/número convertido en espacio, rodeado de espacios. */
+private fun normalizar(texto: String): String {
+    val sinTildes = Normalizer.normalize(texto.uppercase(), Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}+"), "")
+    return " " + sinTildes.replace(Regex("[^A-Z0-9]+"), " ").trim() + " "
 }
+
+private fun coincide(normalizado: String, palabras: List<String>): Boolean =
+    palabras.any { normalizado.contains(" $it ") }
+
+/** Resultado del análisis de una lista de textos (categorías o nombres de canal). */
+data class AnalisisContenido(
+    val esLatino: Boolean,
+    /** Fracción de textos con señal LATAM fuerte. */
+    val proporcionLatino: Double,
+    val esEspana: Boolean,
+    val proporcionEspana: Double,
+)
+
+fun analizarContenido(textos: List<String>): AnalisisContenido {
+    if (textos.isEmpty()) return AnalisisContenido(false, 0.0, false, 0.0)
+    val normalizados = textos.map(::normalizar)
+    val latam = normalizados.count { coincide(it, PALABRAS_LATAM) }.toDouble() / textos.size
+    val espana = normalizados.count { coincide(it, PALABRAS_ESPANA) }.toDouble() / textos.size
+    val esLatino = latam >= UMBRAL_CONTENIDO_LATINO
+    return AnalisisContenido(
+        esLatino = esLatino,
+        proporcionLatino = latam,
+        esEspana = !esLatino && espana >= UMBRAL_CONTENIDO_LATINO,
+        proporcionEspana = espana,
+    )
+}
+
+/** Compatibilidad: `(esLatino, proporcionLatino)`. */
+fun esContenidoLatino(textos: List<String>): Pair<Boolean, Double> =
+    analizarContenido(textos).let { it.esLatino to it.proporcionLatino }

@@ -44,6 +44,7 @@ fun ChatsScreen(
     onAlternarSeleccion: (Long) -> Unit,
     onEscanear: () -> Unit,
     onVolver: () -> Unit,
+    soloLatino: Boolean = false,
 ) {
     var busqueda by remember { mutableStateOf("") }
     var filtroTipo by remember { mutableStateOf<TipoChat?>(null) }
@@ -53,10 +54,10 @@ fun ChatsScreen(
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
         BarraVolver(onVolver)
-        Text("Elige los chats a escanear", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
+        Text(if (soloLatino) "Elige dónde buscar contenido LATINO" else "Elige los chats a escanear", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
         Spacer2()
         Text(
-            "Se buscarán listas M3U/Xtream en los mensajes de los chats marcados.",
+            if (soloLatino) "Marca uno o varios grupos, canales o chats; solo se mostrarán listas activas de Latinoamérica." else "Se buscarán listas M3U/Xtream en los mensajes de los chats marcados.",
             color = TextoSecundario,
             fontSize = 13.sp,
         )

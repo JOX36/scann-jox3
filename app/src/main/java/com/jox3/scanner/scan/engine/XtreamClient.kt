@@ -285,7 +285,13 @@ object XtreamClient {
         return withTimeoutOrNull(TIMEOUT_DNS_MS) {
             withContext(Dispatchers.IO) {
                 try {
-                    InetAddress.getByName(sinEsquema).hostAddress
+                    // Solo IPv4: una IPv6 sin corchetes da un enlace inválido
+                    // (visto en un resultado real), y las de Cloudflare no son
+                    // el servidor real, así que un M3U "por IP" ahí no sirve.
+                    InetAddress.getAllByName(sinEsquema)
+                        .filterIsInstance<java.net.Inet4Address>()
+                        .map { it.hostAddress }
+                        .firstOrNull { it != null && !esIpDeCloudflare(it) }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -293,6 +299,22 @@ object XtreamClient {
                 }
             }
         }
+    }
+
+    private val rangosCloudflare: List<Pair<Long, Int>> = listOf(
+        "173.245.48.0" to 20, "103.21.244.0" to 22, "103.22.200.0" to 22, "103.31.4.0" to 22,
+        "141.101.64.0" to 18, "108.162.192.0" to 18, "190.93.240.0" to 20, "188.114.96.0" to 20,
+        "197.234.240.0" to 22, "198.41.128.0" to 17, "162.158.0.0" to 15, "104.16.0.0" to 13,
+        "104.24.0.0" to 14, "172.64.0.0" to 13, "131.0.72.0" to 22,
+    ).map { (red, bits) -> ipv4ALong(red) to bits }
+
+    private fun ipv4ALong(ip: String): Long =
+        ip.split(".").fold(0L) { acumulado, parte -> (acumulado shl 8) or parte.toLong() }
+
+    /** `true` si [ip] está en un rango publicado de Cloudflare (proxy, no el servidor real). */
+    private fun esIpDeCloudflare(ip: String): Boolean {
+        val valor = runCatching { ipv4ALong(ip) }.getOrNull() ?: return false
+        return rangosCloudflare.any { (red, bits) -> (valor shr (32 - bits)) == (red shr (32 - bits)) }
     }
 
     private val patronIpv4 = Regex("""^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$""")

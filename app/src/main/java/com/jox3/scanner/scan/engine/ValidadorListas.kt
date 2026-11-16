@@ -32,6 +32,8 @@ data class ListaValidada(
     val direccionIp: String? = null,
     /** Texto crudo de estado del panel ("Active") — ver [XtreamClient.InfoCuentaXtream.estadoTexto]. */
     val estadoTexto: String? = null,
+    /** Panel con contenido de España (no LATAM) — ver [analizarContenido]. */
+    val esEspana: Boolean = false,
 )
 
 /** Muestra de nombres de canal usada para la detección LATAM — igual al `limite` que usaba Python. */
@@ -72,13 +74,13 @@ suspend fun validarYEnriquecer(cred: CredencialesXtream, origenChat: String): Li
         series = seriesAsync.await()
         ip = ipAsync.await()
     }
-    var (esLatino, porcentaje) = esContenidoLatino(categorias)
+    var analisis = analizarContenido(categorias)
 
-    if (!esLatino && canales.isNotEmpty()) {
-        val (esLatinoConCanales, porcentajeConCanales) = esContenidoLatino(categorias + canales.take(MUESTRA_CANALES_PARA_LATINO))
-        esLatino = esLatinoConCanales
-        porcentaje = porcentajeConCanales
+    if (!analisis.esLatino && canales.isNotEmpty()) {
+        analisis = analizarContenido(categorias + canales.take(MUESTRA_CANALES_PARA_LATINO))
     }
+    val esLatino = analisis.esLatino
+    val porcentaje = analisis.proporcionLatino
 
     return ListaValidada(
         credenciales = cred,
@@ -99,5 +101,6 @@ suspend fun validarYEnriquecer(cred: CredencialesXtream, origenChat: String): Li
         formatos = info.formatos,
         direccionIp = ip,
         estadoTexto = info.estadoTexto,
+        esEspana = analisis.esEspana,
     )
 }
