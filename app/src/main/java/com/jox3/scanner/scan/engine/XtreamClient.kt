@@ -16,7 +16,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.InetAddress
 import java.time.Instant
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 @Serializable
@@ -47,8 +46,12 @@ private data class InfoUsuario(
     val allowed_output_formats: List<String>? = null,
 )
 
-/** Mismo formato que usa `print_scan_summary()` en Python (`strftime('%Y-%m-%d %H:%M')`, en UTC). */
-private val formateadorFecha = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneOffset.UTC)
+/**
+ * Mismo formato que `print_scan_summary()` en Python (`%Y-%m-%d %H:%M`), pero
+ * en la hora LOCAL del teléfono (pedido del usuario): en UTC un vencimiento
+ * a las 00:00 aparecía casi un día después de lo real para quien está en UTC−5.
+ */
+private val formateadorFecha = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(java.time.ZoneId.systemDefault())
 
 /** `exp_date`/`created_at` llegan como timestamp Unix (segundos) en texto; `null` si el panel no lo da. */
 private fun JsonElement?.comoFechaUtc(): String? =

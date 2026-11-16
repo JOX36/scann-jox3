@@ -623,6 +623,7 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - **Pestaña "Verificar"**: pega una lista en cualquier formato conocido (enlace `get.php`, `player_api.php` o `xmltv.php`; bloque con Host/Usuario/Contraseña como el que genera la app; o `host|usuario|clave`) y muestra el mismo resultado detallado que el detalle de una lista, con copiar enlaces, guardar .txt y enviar a Telegram. Por ahora solo ese resultado (sin extras).
 - **Semáforo de días restantes** (revisado contra `validate_m3u_url` del script de Python; el cálculo de días coincide): una cuenta con `exp_date` 0 (sin vencimiento) ya no sale como "-20000 días 🔴" y las listas sin fecha ya no se pintan en verde (⚪); el estado "Active" sigue en 🟢.
 - La hora de "Escaneado" ahora es la local del teléfono (antes salía en UTC).
+- Etapa 20b: "Creado" y "Vencimiento" también se muestran en la hora local del teléfono (antes UTC). Los días restantes no cambian.
 
 ## Nota sobre el CI
 
