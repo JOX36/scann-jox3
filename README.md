@@ -618,6 +618,12 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - **Botones inferiores**: "Buscar" y "Resultados" cierran el detalle y llevan de verdad a su pantalla (Buscar → menú de modos; Resultados → último resultado, que ahora se conserva aparte). El botón atrás del sistema cierra el detalle / retrocede un paso.
 - **Registro en vivo**: la pantalla de escaneo muestra "📨 N mensajes escaneados" y el chat que se está leyendo.
 
+## Etapa 20
+
+- **Pestaña "Verificar"**: pega una lista en cualquier formato conocido (enlace `get.php`, `player_api.php` o `xmltv.php`; bloque con Host/Usuario/Contraseña como el que genera la app; o `host|usuario|clave`) y muestra el mismo resultado detallado que el detalle de una lista, con copiar enlaces, guardar .txt y enviar a Telegram. Por ahora solo ese resultado (sin extras).
+- **Semáforo de días restantes** (revisado contra `validate_m3u_url` del script de Python; el cálculo de días coincide): una cuenta con `exp_date` 0 (sin vencimiento) ya no sale como "-20000 días 🔴" y las listas sin fecha ya no se pintan en verde (⚪); el estado "Active" sigue en 🟢.
+- La hora de "Escaneado" ahora es la local del teléfono (antes salía en UTC).
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

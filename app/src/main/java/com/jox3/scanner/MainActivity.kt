@@ -52,6 +52,8 @@ import com.jox3.scanner.scan.engine.ListaValidada
 import com.jox3.scanner.ui.chats.ElegirTemasScreen
 import com.jox3.scanner.ui.common.FondoConGlow
 import com.jox3.scanner.ui.results.DetalleListaScreen
+import com.jox3.scanner.ui.verificador.VerificadorScreen
+import com.jox3.scanner.verificador.VerificadorViewModel
 import com.jox3.scanner.telegram.CredencialesApiTelegram
 import com.jox3.scanner.telegram.CredencialesBotTelegram
 import com.jox3.scanner.telegram.TdLibAuthClient
@@ -123,6 +125,7 @@ class MainActivity : ComponentActivity() {
 private enum class Pestana(val etiqueta: String, val icono: String) {
     BUSCAR("Buscar", "🔎"),
     RESULTADOS("Resultados", "📋"),
+    VERIFICADOR("Verificar", "✅"),
     AJUSTES("Ajustes", "⚙️"),
 }
 
@@ -140,6 +143,8 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
         factory = ScanFlowViewModelFactory(chatsRepository, escanerRepository),
     )
     val estadoEscaneo by scanViewModel.estado.collectAsState()
+    val verificadorViewModel: VerificadorViewModel = viewModel()
+    val estadoVerificador by verificadorViewModel.estado.collectAsState()
 
     // Launcher para volver de la pantalla de "Instalar apps desconocidas"
     // y reintentar la descarga si el usuario concedió el permiso.
@@ -183,6 +188,9 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
                 estadoEscaneo is EstadoFlujoEscaneo.EligiendoChatUnico ||
                 estadoEscaneo is EstadoFlujoEscaneo.EligiendoTemas),
     ) { scanViewModel.volver() }
+    BackHandler(enabled = pestanaActual == Pestana.VERIFICADOR.ordinal && estadoVerificador.lista != null) {
+        verificadorViewModel.nueva()
+    }
     BackHandler(enabled = pestanaActual != Pestana.BUSCAR.ordinal) { pestanaActual = Pestana.BUSCAR.ordinal }
 
     Scaffold(
@@ -202,6 +210,7 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
                             when (Pestana.entries[indice]) {
                                 Pestana.BUSCAR -> scanViewModel.irABuscar()
                                 Pestana.RESULTADOS -> scanViewModel.irAResultados()
+                                Pestana.VERIFICADOR -> if (pestanaActual == indice) verificadorViewModel.nueva()
                                 Pestana.AJUSTES -> Unit
                             }
                             pestanaActual = indice
@@ -224,6 +233,26 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
             when (Pestana.entries[pestanaActual]) {
                 Pestana.BUSCAR -> PantallaEscaneo(estadoEscaneo, scanViewModel)
                 Pestana.RESULTADOS -> PantallaResultadosTab(estadoEscaneo, scanViewModel)
+                Pestana.VERIFICADOR -> {
+                    val listaVerificada = estadoVerificador.lista
+                    if (listaVerificada == null) {
+                        VerificadorScreen(
+                            texto = estadoVerificador.texto,
+                            verificando = estadoVerificador.verificando,
+                            error = estadoVerificador.error,
+                            onTextoCambiado = verificadorViewModel::cambiarTexto,
+                            onVerificar = verificadorViewModel::verificar,
+                        )
+                    } else {
+                        DetalleListaConectada(
+                            lista = listaVerificada,
+                            detalle = estadoVerificador.detalle,
+                            cargando = estadoVerificador.detalleCargando,
+                            onVolver = verificadorViewModel::nueva,
+                            onConsultar = verificadorViewModel::consultarDetalle,
+                        )
+                    }
+                }
                 Pestana.AJUSTES -> {
                     val contexto = LocalContext.current
                     val credencialesBot = remember { CredencialesBotTelegram(contexto) }

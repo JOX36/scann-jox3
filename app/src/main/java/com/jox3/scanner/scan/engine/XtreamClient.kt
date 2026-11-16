@@ -52,7 +52,7 @@ private val formateadorFecha = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").w
 
 /** `exp_date`/`created_at` llegan como timestamp Unix (segundos) en texto; `null` si el panel no lo da. */
 private fun JsonElement?.comoFechaUtc(): String? =
-    this.comoTexto()?.toLongOrNull()?.let { segundos -> formateadorFecha.format(Instant.ofEpochSecond(segundos)) }
+    this.comoTexto()?.toLongOrNull()?.takeIf { it > 0 }?.let { segundos -> formateadorFecha.format(Instant.ofEpochSecond(segundos)) }
 
 private fun JsonElement?.comoTexto(): String? = (this as? JsonPrimitive)?.content
 
@@ -134,7 +134,9 @@ object XtreamClient {
             // `exp_date` viene como timestamp Unix en texto; "días
             // restantes" se redondea igual que Python (diferencia de
             // fechas en días, puede dar negativo si ya venció).
-            val diasRestantes = info.exp_date.comoTexto()?.toLongOrNull()?.let { segundos ->
+            // exp_date 0 (o negativo) = cuenta sin vencimiento en muchos paneles:
+            // antes se leía como 1970 → "-20000 días 🔴" aun siendo activa.
+            val diasRestantes = info.exp_date.comoTexto()?.toLongOrNull()?.takeIf { it > 0 }?.let { segundos ->
                 val milisVencimiento = segundos * 1000
                 val milisRestantes = milisVencimiento - System.currentTimeMillis()
                 Math.floorDiv(milisRestantes, 86_400_000L).toInt()

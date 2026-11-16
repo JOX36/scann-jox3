@@ -87,3 +87,44 @@ fun extraerEnlaces(texto: String): List<String> =
         .filter { it.contains("get.php?") }
         .distinct()
         .toList()
+
+private val patronUrlCualquiera = Regex("""https?://[^\s'"<>]+""", RegexOption.IGNORE_CASE)
+
+private fun enlaceM3uDe(host: String, usuario: String, clave: String) =
+    "$host/get.php?username=$usuario&password=$clave&type=m3u_plus"
+
+private fun valorEtiquetado(texto: String, etiquetas: String): String? =
+    Regex("""(?im)^\W*(?:$etiquetas)\W*[:=]\s*(\S+)""").find(texto)?.groupValues?.get(1)
+
+/**
+ * Para el Verificador: saca las credenciales de un texto pegado en
+ * CUALQUIER formato conocido — enlace `get.php`, `player_api.php` o
+ * `xmltv.php` con `username`/`password`, un bloque con etiquetas (como el
+ * resultado que da la propia app: "Host: …", "Usuario: …", "Contraseña: …"),
+ * o una línea `host|usuario|clave` / `host usuario clave`.
+ */
+fun extraerCredencialesDeTexto(texto: String): CredencialesXtream? {
+    for (coincidencia in patronUrlCualquiera.findAll(texto)) {
+        val url = recortarBasuraFinal(coincidencia.value)
+        val cred = extraerCredencialesXtream(url) ?: continue
+        return if (url.contains("get.php?")) cred
+        else cred.copy(urlOriginal = enlaceM3uDe(cred.host, cred.username, cred.password))
+    }
+
+    fun armar(hostCrudo: String?, usuario: String?, clave: String?): CredencialesXtream? {
+        if (hostCrudo.isNullOrBlank() || usuario.isNullOrBlank() || clave.isNullOrBlank()) return null
+        val conEsquema = if (hostCrudo.contains("://")) hostCrudo else "http://$hostCrudo"
+        val host = Regex("""^https?://[^/\s]+""", RegexOption.IGNORE_CASE).find(conEsquema)?.value ?: return null
+        return CredencialesXtream(host, usuario, clave, enlaceM3uDe(host, usuario, clave))
+    }
+
+    armar(
+        valorEtiquetado(texto, "host|servidor|server|url|dns|panel"),
+        valorEtiquetado(texto, "usuario|user|username|login"),
+        valorEtiquetado(texto, "password|pass|contraseña|clave|pw"),
+    )?.let { return it }
+
+    val linea = texto.lineSequence().map { it.trim() }.firstOrNull { it.isNotBlank() } ?: return null
+    val partes = linea.split(Regex("""[|\s;,]+""")).filter { it.isNotBlank() }
+    return if (partes.size == 3) armar(partes[0], partes[1], partes[2]) else null
+}

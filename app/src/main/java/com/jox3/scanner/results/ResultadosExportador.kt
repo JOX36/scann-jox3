@@ -9,7 +9,6 @@ import com.jox3.scanner.scan.engine.ListaValidada
 import com.jox3.scanner.scan.engine.XtreamClient
 import java.io.File
 import java.time.Instant
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -21,14 +20,14 @@ import java.util.Locale
  */
 object ResultadosExportador {
 
-    private val formateadorEscaneo = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneOffset.UTC)
+    private val formateadorEscaneo = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(java.time.ZoneId.systemDefault())
 
     /** Mismo umbral que usa [com.jox3.scanner.ui.results.ResultsScreen] para "por vencer". */
     private const val UMBRAL_POR_VENCER = 15
 
     /** 🟢 activa / 🟡 por vencer / 🔴 vencida — igual al ejemplo que pasó el usuario (ya no el ✅ fijo que tenía antes). */
     private fun emojiEstado(dias: Int?): String = when {
-        dias == null -> "🟢"
+        dias == null -> "⚪" // sin fecha de vencimiento: no es "verde" (no sabemos cuánto queda)
         dias < 0 -> "🔴"
         dias < UMBRAL_POR_VENCER -> "🟡"
         else -> "🟢"
@@ -77,7 +76,7 @@ object ResultadosExportador {
             }
             builder.appendLine("👤 Usuario: ${cred.username}")
             builder.appendLine("🔑 Contraseña: ${cred.password}")
-            builder.appendLine("${emojiEstado(lista.diasRestantes)} Estado: ${lista.estadoTexto ?: "Active"}")
+            builder.appendLine("${if (lista.diasRestantes == null) "🟢" else emojiEstado(lista.diasRestantes)} Estado: ${lista.estadoTexto ?: "Active"}")
             builder.appendLine("🔗 Conexiones: ${conexionesTexto(lista)}")
             builder.appendLine("📅 Creado: ${lista.fechaCreacion ?: "No especificada"}")
             builder.appendLine("🗓️ Vencimiento: ${lista.fechaVencimiento ?: "No especificada"}")
@@ -119,7 +118,7 @@ object ResultadosExportador {
         builder.appendLine("🌐 Host: ${cred.host}")
         builder.appendLine("👤 Usuario: ${cred.username}")
         builder.appendLine("🔑 Contraseña: ${cred.password}")
-        builder.appendLine("${emojiEstado(lista.diasRestantes)} Estado: ${lista.estadoTexto ?: "Active"}")
+        builder.appendLine("${if (lista.diasRestantes == null) "🟢" else emojiEstado(lista.diasRestantes)} Estado: ${lista.estadoTexto ?: "Active"}")
         builder.appendLine("🔗 Conexiones: ${conexionesTexto(lista)}")
         builder.appendLine("📅 Creado: ${lista.fechaCreacion ?: "No especificada"}")
         builder.appendLine("🗓️ Vencimiento: ${lista.fechaVencimiento ?: "No especificada"}")
@@ -152,7 +151,11 @@ object ResultadosExportador {
             builder.appendLine("🎥 Películas (${detalle.categoriasPeliculas.size}): ${detalle.categoriasPeliculas.joinToString(", ")}")
             builder.appendLine()
         }
-        builder.appendLine("📂 Encontrada en: ${lista.origenChat}")
+        if (lista.origenChat == "Verificador") {
+            builder.appendLine("🔍 Verificada manualmente")
+        } else {
+            builder.appendLine("📂 Encontrada en: ${lista.origenChat}")
+        }
         builder.appendLine("📅 Escaneado: $escaneadoEn")
 
         return builder.toString()
