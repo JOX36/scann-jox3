@@ -24,7 +24,15 @@ data class EstadoVerificador(
 )
 
 /** Verifica UNA lista pegada a mano (cualquier formato conocido), sin escanear chats. */
-class VerificadorViewModel : ViewModel() {
+class VerificadorViewModel(private val contextoApp: android.content.Context? = null) : ViewModel() {
+
+    private fun avisar(texto: String) {
+        val ctx = contextoApp ?: return
+        if (!com.jox3.scanner.scan.EstadoApp.visible) {
+            com.jox3.scanner.scan.ServicioEscaneo.notificarTerminado(ctx, "Verificación terminada", texto)
+        }
+    }
+
     private val _estado = MutableStateFlow(EstadoVerificador())
     val estado: StateFlow<EstadoVerificador> = _estado.asStateFlow()
     private var job: Job? = null
@@ -48,11 +56,13 @@ class VerificadorViewModel : ViewModel() {
                         error = "La lista no está activa: credenciales incorrectas, vencida o el panel no responde.",
                     )
                 }
+                avisar("La lista no está activa o no respondió.")
                 return@launch
             }
             _estado.update { it.copy(verificando = false, lista = lista, detalle = null, detalleCargando = true) }
             val detalle = runCatching { consultarDetalleLista(lista) }.getOrNull()
             _estado.update { it.copy(detalle = detalle, detalleCargando = false) }
+            avisar("${lista.credenciales.host}: activa")
         }
     }
 
@@ -77,4 +87,9 @@ class VerificadorViewModel : ViewModel() {
     companion object {
         const val ORIGEN = "Verificador"
     }
+}
+
+class VerificadorViewModelFactory(private val contextoApp: android.content.Context) : androidx.lifecycle.ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = VerificadorViewModel(contextoApp) as T
 }

@@ -83,6 +83,16 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    override fun onStart() {
+        super.onStart()
+        com.jox3.scanner.scan.EstadoApp.visible = true
+    }
+
+    override fun onStop() {
+        com.jox3.scanner.scan.EstadoApp.visible = false
+        super.onStop()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Guarda la traza si la app se cierra por un error, para poder mostrar el motivo al reabrir.
@@ -142,66 +152,30 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
     val chatsRepository = remember { TdChatsRepository(authClient) }
     val escanerRepository = remember { TdEscanerRepository(authClient) }
     val scanViewModel: ScanFlowViewModel = viewModel(
+        viewModelStoreOwner = com.jox3.scanner.scan.AlmacenViewModelsProceso,
         factory = run {
             val contextoApp = LocalContext.current
             val motivo = remember { com.jox3.scanner.scan.DiagnosticoCierre.motivoUltimoCierre(contextoApp, contextoApp.filesDir) }
-            ScanFlowViewModelFactory(chatsRepository, escanerRepository, contextoApp.filesDir, motivo)
+            ScanFlowViewModelFactory(chatsRepository, escanerRepository, contextoApp.filesDir, motivo, contextoApp.applicationContext)
         },
     )
     val estadoEscaneo by scanViewModel.estado.collectAsState()
-    val verificadorViewModel: VerificadorViewModel = viewModel()
+    val contextoVerificador = LocalContext.current.applicationContext
+    val verificadorViewModel: VerificadorViewModel = viewModel(
+        viewModelStoreOwner = com.jox3.scanner.scan.AlmacenViewModelsProceso,
+        factory = com.jox3.scanner.verificador.VerificadorViewModelFactory(contextoVerificador),
+    )
     val estadoVerificador by verificadorViewModel.estado.collectAsState()
 
-    // Escaneo en segundo plano: mientras se escanea (o se verifica una lista) un
-    // servicio en primer plano mantiene viva la app aunque se salga de ella.
-    val contextoServicio = LocalContext.current
+    // Permiso de notificaciones (Android 13+) la primera vez que se escanea; el servicio y los
+    // avisos los gestiona el propio ViewModel (ver ScanFlowViewModel.vigilarServicio).
     val permisoNotificaciones = rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
     ) { /* con o sin permiso el servicio funciona; solo cambia si se ve la notificación */ }
-    val textoEscaneo: String? = when (val e = estadoEscaneo) {
-        is EstadoFlujoEscaneo.Escaneando -> buildString {
-            append("${e.procesados}/${e.total} listas · ${e.mensajesChatsTerminados + e.mensajesChatActual} mensajes")
-            e.chatLeyendo?.let { append(" · leyendo $it") }
-        }
-        else -> if (estadoVerificador.verificando) "Verificando lista…" else null
-    }
-    // Aviso al terminar si la app no está a la vista (el usuario salió mientras escaneaba).
-    val ciclo = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
-    var estabaEscaneando by remember { mutableStateOf(false) }
-    var estabaVerificando by remember { mutableStateOf(false) }
-    LaunchedEffect(estadoEscaneo, estadoVerificador.verificando) {
-        val fueraDePantalla = !ciclo.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
-        val e = estadoEscaneo
-        if (estabaEscaneando && e is EstadoFlujoEscaneo.Resultados && fueraDePantalla) {
-            val activas = e.listas.count { it.activa }
-            com.jox3.scanner.scan.ServicioEscaneo.notificarTerminado(
-                contextoServicio,
-                "Escaneo terminado",
-                "$activas lista(s) activa(s) encontrada(s). Toca para ver los resultados.",
-            )
-        }
-        estabaEscaneando = e is EstadoFlujoEscaneo.Escaneando
-        if (estabaVerificando && !estadoVerificador.verificando && fueraDePantalla) {
-            val lista = estadoVerificador.lista
-            com.jox3.scanner.scan.ServicioEscaneo.notificarTerminado(
-                contextoServicio,
-                "Verificación terminada",
-                if (lista != null) "${lista.credenciales.host}: activa" else "La lista no está activa o no respondió.",
-            )
-        }
-        estabaVerificando = estadoVerificador.verificando
-    }
-    LaunchedEffect(textoEscaneo != null) {
-        if (textoEscaneo != null && android.os.Build.VERSION.SDK_INT >= 33) {
+    val escaneando = estadoEscaneo is EstadoFlujoEscaneo.Escaneando
+    LaunchedEffect(escaneando) {
+        if (escaneando && android.os.Build.VERSION.SDK_INT >= 33) {
             permisoNotificaciones.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }
-    LaunchedEffect(textoEscaneo) {
-        if (textoEscaneo == null) {
-            com.jox3.scanner.scan.ServicioEscaneo.detener(contextoServicio)
-        } else {
-            kotlinx.coroutines.delay(800) // agrupa cambios rápidos para no saturar las notificaciones
-            com.jox3.scanner.scan.ServicioEscaneo.iniciarOActualizar(contextoServicio, textoEscaneo)
         }
     }
 

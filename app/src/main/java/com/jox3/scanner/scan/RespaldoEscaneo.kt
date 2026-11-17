@@ -71,6 +71,13 @@ object DiagnosticoCierre {
         val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val salida = runCatching { am.getHistoricalProcessExitReasons(context.packageName, 0, 1).firstOrNull() }.getOrNull()
             ?: return null
+        // Un cierre ANTERIOR al último guardado del escaneo no pudo ser la causa (la app siguió trabajando
+        // después): así no se culpaba a una actualización vieja. Caso típico real: la Activity se cierra
+        // pero el proceso sigue vivo, y el "último cierre" registrado es de hace rato.
+        val ultimoGuardado = File(carpeta, "respaldo_escaneo.json").lastModified()
+        if (salida.timestamp < ultimoGuardado - 5_000) {
+            return "el proceso no murió: el escaneo se cortó al cerrarse la pantalla de la app (el último cierre registrado por Android es anterior)"
+        }
         val motivo = when (salida.reason) {
             ApplicationExitInfo.REASON_CRASH -> "error de la app (crash)"
             ApplicationExitInfo.REASON_CRASH_NATIVE -> "error nativo (TDLib/librería)"

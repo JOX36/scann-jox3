@@ -659,6 +659,13 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - El aviso de recuperación ahora sale en "Diagnóstico por chat" (antes aparecía bajo "No se pudieron leer 1 chat(s)").
 - Primer caso real: el motivo fue `código 16 … installPackageLI` = **se instaló una versión nueva de la app encima** (Android cierra el proceso al actualizar). No era un fallo del escaneo; ahora ese código se muestra en español.
 
+## Etapa 26 — El escaneo ya no se corta al cerrar la pantalla
+
+- **Causa real del "se interrumpió"**: el escaneo vivía en un ViewModel atado a la pantalla (Activity). Al cerrar la app desde "recientes" o con atrás, la pantalla se destruía, el ViewModel se limpiaba y el escaneo se cancelaba aunque el servicio en primer plano mantuviera el proceso vivo. No era una actualización ni el sistema matando la app.
+- Los ViewModels del escaneo y del verificador ahora viven a nivel de proceso (`AlmacenViewModelsProceso`): el escaneo sigue con o sin pantalla y al volver a abrir se retoma el progreso real.
+- El control del servicio en primer plano y el aviso "Escaneo terminado" pasaron de la pantalla al ViewModel (`EstadoApp.visible` indica si la app está a la vista), así funcionan aunque la pantalla no exista.
+- El motivo del cierre solo cita el registro de Android si es posterior al último guardado del escaneo; si no, indica que se cortó al cerrarse la pantalla (se acabó culpar a una instalación antigua).
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

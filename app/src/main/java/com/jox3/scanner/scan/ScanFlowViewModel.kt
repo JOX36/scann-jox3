@@ -11,6 +11,8 @@ import com.jox3.scanner.scan.engine.DetalleLista
 import com.jox3.scanner.scan.engine.ListaValidada
 import com.jox3.scanner.scan.engine.consultarDetalleLista
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -119,6 +121,8 @@ class ScanFlowViewModel(
     private val carpetaRespaldo: java.io.File? = null,
     /** Motivo del último cierre de la app (ver [DiagnosticoCierre]), para mostrarlo al recuperar. */
     motivoUltimoCierre: String? = null,
+    /** Contexto de la aplicación (no de la Activity) para el servicio y los avisos de fin de escaneo. */
+    private val contextoApp: android.content.Context? = null,
 ) : ViewModel() {
 
     private val _estado = MutableStateFlow<EstadoFlujoEscaneo>(EstadoFlujoEscaneo.CargandoChats)
@@ -148,6 +152,39 @@ class ScanFlowViewModel(
     private val _detalleCargando = MutableStateFlow(false)
     val detalleCargando: StateFlow<Boolean> = _detalleCargando.asStateFlow()
     private var detalleJob: Job? = null
+
+    /**
+     * Mantiene el servicio en primer plano mientras se escanea y avisa al terminar si la
+     * app no está a la vista. Vive aquí (y no en la pantalla) para seguir funcionando
+     * aunque la Activity se destruya.
+     */
+    private fun vigilarServicio(ctx: android.content.Context) {
+        viewModelScope.launch {
+            var estabaEscaneando = false
+            estado.collectLatest { e ->
+                val texto = (e as? EstadoFlujoEscaneo.Escaneando)?.let {
+                    buildString {
+                        append("${it.procesados}/${it.total} listas · ${it.mensajesChatsTerminados + it.mensajesChatActual} mensajes")
+                        it.chatLeyendo?.let { chat -> append(" · leyendo $chat") }
+                    }
+                }
+                if (texto == null) {
+                    ServicioEscaneo.detener(ctx)
+                    if (estabaEscaneando && e is EstadoFlujoEscaneo.Resultados && !EstadoApp.visible) {
+                        ServicioEscaneo.notificarTerminado(
+                            ctx, "Escaneo terminado",
+                            "${e.listas.count { it.activa }} lista(s) activa(s) encontrada(s). Toca para ver los resultados.",
+                        )
+                    }
+                    estabaEscaneando = false
+                } else {
+                    estabaEscaneando = true
+                    delay(800) // agrupa cambios rápidos para no saturar las notificaciones
+                    ServicioEscaneo.iniciarOActualizar(ctx, texto)
+                }
+            }
+        }
+    }
 
     private fun respaldar(
         encontradas: List<ListaValidada>, errores: List<String>, diagnostico: List<String>, enCurso: Boolean,
@@ -200,6 +237,7 @@ class ScanFlowViewModel(
 
     init {
         cargarChats()
+        contextoApp?.let { vigilarServicio(it) }
     }
 
     private fun cargarChats() {
@@ -540,9 +578,10 @@ class ScanFlowViewModelFactory(
     private val escanerRepository: EscanerRepository,
     private val carpetaRespaldo: java.io.File? = null,
     private val motivoUltimoCierre: String? = null,
+    private val contextoApp: android.content.Context? = null,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return ScanFlowViewModel(chatsRepository, escanerRepository, carpetaRespaldo, motivoUltimoCierre) as T
+        return ScanFlowViewModel(chatsRepository, escanerRepository, carpetaRespaldo, motivoUltimoCierre, contextoApp) as T
     }
 }
