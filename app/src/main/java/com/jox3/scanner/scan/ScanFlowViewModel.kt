@@ -175,11 +175,12 @@ class ScanFlowViewModel(
                             (motivoUltimoCierre?.let { " · motivo del cierre: $it" } ?: "") + ".",
                     )
                 } else emptyList()
-                val erroresConAviso = aviso + r.errores
-                // El aviso queda guardado y la copia deja de figurar "en curso": no se repite en cada apertura.
-                if (r.enCurso) AlmacenRespaldo.guardar(carpeta, r.copy(errores = erroresConAviso, enCurso = false))
+                // El aviso va en el diagnóstico (no en "errores": ahí salía como "No se pudieron leer 1 chat(s)").
+                val diagnosticoConAviso = aviso + r.diagnostico
+                // Queda guardado y la copia deja de figurar "en curso": no se repite en cada apertura.
+                if (r.enCurso) AlmacenRespaldo.guardar(carpeta, r.copy(diagnostico = diagnosticoConAviso, enCurso = false))
                 _ultimoResultado.value = EstadoFlujoEscaneo.Resultados(
-                    r.listas, erroresConAviso, r.diagnostico, emptyList(), r.nombreArchivo,
+                    r.listas, r.errores, diagnosticoConAviso, emptyList(), r.nombreArchivo,
                 )
             }
         }

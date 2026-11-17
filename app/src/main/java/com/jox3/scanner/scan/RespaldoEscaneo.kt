@@ -81,9 +81,14 @@ object DiagnosticoCierre {
             ApplicationExitInfo.REASON_USER_STOPPED -> "la detuviste desde Ajustes"
             ApplicationExitInfo.REASON_SIGNALED -> "el sistema la terminó"
             ApplicationExitInfo.REASON_PERMISSION_CHANGE -> "cambió un permiso"
+            16 -> "se instaló una versión nueva de la app encima (actualización)" // REASON_PACKAGE_UPDATED
+            15 -> "cambió el estado de la app (instalación/desactivación)" // REASON_PACKAGE_STATE_CHANGE
+            14 -> "el sistema la congeló en segundo plano" // REASON_FREEZER
             ApplicationExitInfo.REASON_OTHER -> "otro motivo del sistema (ahorro de batería u optimización)"
             else -> "código ${salida.reason}"
         }
-        return motivo + (salida.description?.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: "")
+        // Para códigos conocidos el texto en español basta; la descripción técnica solo en los desconocidos.
+        val conocido = !motivo.startsWith("código")
+        return if (conocido) motivo else motivo + (salida.description?.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: "")
     }
 }

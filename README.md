@@ -654,6 +654,11 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - **Recuperación tras un cierre inesperado**: el escaneo se guarda en disco (`respaldo_escaneo.json`) cada vez que se valida una lista. Si la app se cierra y se reinicia, las listas ya validadas reaparecen en la pestaña **Resultados** con un aviso ("El escaneo anterior se interrumpió. Se recuperaron N lista(s)…"). No se guarda el avance de lectura de mensajes: hay que volver a escanear lo que faltaba.
 - **Diagnóstico del cierre**: se guarda la traza de cualquier error no controlado (`ultimo_error.txt`) y se consulta el motivo que registró Android (`ApplicationExitInfo`: falta de memoria, error nativo, ahorro de batería, etc.). El motivo sale en ese mismo aviso, para saber por qué se cerró.
 
+## Etapa 25b
+
+- El aviso de recuperación ahora sale en "Diagnóstico por chat" (antes aparecía bajo "No se pudieron leer 1 chat(s)").
+- Primer caso real: el motivo fue `código 16 … installPackageLI` = **se instaló una versión nueva de la app encima** (Android cierra el proceso al actualizar). No era un fallo del escaneo; ahora ese código se muestra en español.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
