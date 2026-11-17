@@ -11,6 +11,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -141,10 +146,10 @@ class MainActivity : ComponentActivity() {
  * hospedado aquí arriba.
  */
 private enum class Pestana(val etiqueta: String, val icono: androidx.compose.ui.graphics.vector.ImageVector) {
-    BUSCAR("Buscar", androidx.compose.material.icons.Icons.Filled.Search),
-    RESULTADOS("Resultados", androidx.compose.material.icons.Icons.AutoMirrored.Filled.List),
-    VERIFICADOR("Verificar", "✅"),
-    AJUSTES("Ajustes", androidx.compose.material.icons.Icons.Filled.Settings),
+    BUSCAR("Buscar", Icons.Filled.Search),
+    RESULTADOS("Resultados", Icons.AutoMirrored.Filled.List),
+    VERIFICADOR("Verificar", Icons.Filled.CheckCircle),
+    AJUSTES("Ajustes", Icons.Filled.Settings),
 }
 
 @Composable
