@@ -52,6 +52,7 @@ private enum class FiltroResultados(val etiqueta: String) {
 @Composable
 fun ResultsScreen(
     listas: List<ListaValidada>,
+    resumen: com.jox3.scanner.scan.ResumenEscaneo? = null,
     onEscanearDeNuevo: () -> Unit,
     errores: List<String> = emptyList(),
     diagnostico: List<String> = emptyList(),
@@ -76,10 +77,14 @@ fun ResultsScreen(
         Text("Resultados", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
         Spacer(Modifier.height(12.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            EstadisticaChip("Activas", activas.size.toString(), AcentoApp, Modifier.weight(1f))
-            EstadisticaChip("Validadas", listas.size.toString(), TextoPrimario, Modifier.weight(1f))
-            EstadisticaChip("LATAM", latam.size.toString(), AmarilloApp, Modifier.weight(1f))
+        if (resumen != null) {
+            ResumenFinal(resumen, porVencer = porVencer.size)
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                EstadisticaChip("Activas", activas.size.toString(), AcentoApp, Modifier.weight(1f))
+                EstadisticaChip("Validadas", listas.size.toString(), TextoPrimario, Modifier.weight(1f))
+                EstadisticaChip("LATAM", latam.size.toString(), com.jox3.scanner.ui.theme.AcentoSecundario, Modifier.weight(1f))
+            }
         }
 
         if (errores.isNotEmpty()) {
@@ -148,6 +153,59 @@ fun ResultsScreen(
         }
         Button(onClick = onEscanearDeNuevo, modifier = Modifier.fillMaxWidth()) {
             Text("Escanear de nuevo")
+        }
+    }
+}
+
+/**
+ * Resumen final del escaneo: totales de TODAS las listas validadas (no solo las que el modo deja en
+ * pantalla). Colores con significado fijo en toda la app: verde = activa, rojo = caída, turquesa = LATAM,
+ * violeta = España, amarillo = por vencer.
+ */
+@Composable
+private fun ResumenFinal(r: com.jox3.scanner.scan.ResumenEscaneo, porVencer: Int) {
+    val tasa = if (r.escaneadas > 0) r.activas * 100 / r.escaneadas else 0
+    Surface(
+        color = SuperficieApp,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, com.jox3.scanner.ui.theme.BordeHud),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text("RESUMEN DEL ESCANEO", color = TextoSecundario, fontSize = 10.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
+                Text("$tasa% activas", color = AcentoApp, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = com.jox3.scanner.ui.common.FuenteHud)
+            }
+            Spacer(Modifier.height(4.dp))
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = tasa / 100f,
+                color = AcentoApp,
+                trackColor = ErrorApp.copy(alpha = 0.35f),
+                modifier = Modifier.fillMaxWidth().height(4.dp),
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                EstadisticaChip("Escaneadas", r.escaneadas.toString(), TextoPrimario, Modifier.weight(1f))
+                EstadisticaChip("ON", r.activas.toString(), AcentoApp, Modifier.weight(1f))
+                EstadisticaChip("OFF", r.caidas.toString(), ErrorApp, Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                EstadisticaChip("Latinas", r.latinas.toString(), com.jox3.scanner.ui.theme.AcentoSecundario, Modifier.weight(1f))
+                EstadisticaChip("No latinas", r.noLatinas.toString(), TextoPrimario, Modifier.weight(1f))
+                EstadisticaChip("España", r.espana.toString(), com.jox3.scanner.ui.theme.VioletaApp, Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(10.dp))
+            val min = r.duracionSeg / 60
+            val seg = r.duracionSeg % 60
+            val partes = buildList {
+                if (porVencer > 0) add("⏳ $porVencer por vencer")
+                if (r.mensajes > 0) add("📨 ${r.mensajes} mensajes")
+                if (r.duracionSeg > 0) add("⏱ %d:%02d".format(min, seg))
+            }
+            if (partes.isNotEmpty()) {
+                Text(partes.joinToString("  ·  "), color = TextoSecundario, fontSize = 12.sp)
+            }
         }
     }
 }

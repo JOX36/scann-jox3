@@ -57,6 +57,7 @@ fun ScanProgressScreen(
     chatLeyendo: String? = null,
     mensajesChatActual: Int = 0,
     mensajesTotales: Int = 0,
+    resumen: com.jox3.scanner.scan.ResumenEscaneo = com.jox3.scanner.scan.ResumenEscaneo(),
     onDetener: (() -> Unit)? = null,
     onCompartirRegistro: (() -> Unit)? = null,
 ) {
@@ -144,9 +145,9 @@ fun ScanProgressScreen(
 
         if (total > 0) {
             Spacer(Modifier.height(16.dp))
-            val activas = encontradas.count { it.activa }
-            val caidas = encontradas.count { !it.activa }
-            val latam = encontradas.count { it.esLatino }
+            val activas = resumen.activas
+            val caidas = resumen.caidas
+            val latam = resumen.latinas
             val segundos = ((ahoraMs - inicioMs).coerceAtLeast(1000L)) / 1000.0
             val porSegundo = procesados / segundos
 
@@ -156,7 +157,7 @@ fun ScanProgressScreen(
             }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                EstadisticaCelda("De LATAM", latam.toString(), TextoPrimario, Modifier.weight(1f))
+                EstadisticaCelda("De LATAM", latam.toString(), com.jox3.scanner.ui.theme.AcentoSecundario, Modifier.weight(1f))
                 EstadisticaCelda("Validaciones/seg", "≈${porSegundo.toInt()}", TextoPrimario, Modifier.weight(1f))
             }
 

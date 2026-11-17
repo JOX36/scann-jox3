@@ -6,6 +6,9 @@ import androidx.lifecycle.ViewModelStoreOwner
 /** `true` mientras la pantalla de la app está a la vista (la actualiza MainActivity en onStart/onStop). */
 object EstadoApp {
     @Volatile var visible: Boolean = false
+
+    /** `true` cuando la animación de bienvenida ya se mostró en este proceso. */
+    @Volatile var inicioMostrado: Boolean = false
 }
 
 /**

@@ -22,6 +22,7 @@ val TextoSecundario = Color(0xFF8CA69D)
 val TextoTerciarioApp = Color(0xFF526059) // el más apagado: íconos/etiquetas inactivos de la barra inferior
 val ErrorApp = Color(0xFFF87171)
 val AmarilloApp = Color(0xFFFBBF24)
+val VioletaApp = Color(0xFFA78BFA) // España / "otros" (distinto de verde=activa, amarillo=aviso, rojo=error, turquesa=LATAM)
 val OnAcentoApp = Color(0xFF06231F) // texto oscuro sobre fondos con AcentoApp
 
 /** Degradado esmeralda→turquesa para los chips de ícono "destacados" (igual que en el preview elegido). */

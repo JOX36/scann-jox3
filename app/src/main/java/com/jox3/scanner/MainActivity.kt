@@ -121,7 +121,9 @@ class MainActivity : ComponentActivity() {
                             PantallaPrincipal(authClient)
                         }
                     }
-                    var mostrarInicio by remember { mutableStateOf(true) }
+                    // Solo en el arranque en frío del proceso: rotar la pantalla o reabrir la app con el proceso vivo NO repite la animación.
+                    val primerInicio = remember { !com.jox3.scanner.scan.EstadoApp.inicioMostrado.also { com.jox3.scanner.scan.EstadoApp.inicioMostrado = true } }
+                    var mostrarInicio by remember { mutableStateOf(primerInicio) }
                     if (mostrarInicio) {
                         com.jox3.scanner.ui.common.PantallaInicio(onTerminado = { mostrarInicio = false })
                     }
@@ -138,11 +140,11 @@ class MainActivity : ComponentActivity() {
  * perder el estado, porque ambas leen del mismo [ScanFlowViewModel]
  * hospedado aquí arriba.
  */
-private enum class Pestana(val etiqueta: String, val icono: String) {
-    BUSCAR("Buscar", "🔎"),
-    RESULTADOS("Resultados", "📋"),
+private enum class Pestana(val etiqueta: String, val icono: androidx.compose.ui.graphics.vector.ImageVector) {
+    BUSCAR("Buscar", androidx.compose.material.icons.Icons.Filled.Search),
+    RESULTADOS("Resultados", androidx.compose.material.icons.Icons.AutoMirrored.Filled.List),
     VERIFICADOR("Verificar", "✅"),
-    AJUSTES("Ajustes", "⚙️"),
+    AJUSTES("Ajustes", androidx.compose.material.icons.Icons.Filled.Settings),
 }
 
 @Composable
@@ -233,37 +235,22 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
     Scaffold(
         containerColor = Color.Transparent,
         bottomBar = {
-            NavigationBar(
-                containerColor = SuperficieFuerteApp,
-                contentColor = TextoTerciarioApp,
-                modifier = Modifier.border(BorderStroke(1.dp, BordeApp)).padding(top = 1.dp),
-            ) {
-                Pestana.entries.forEachIndexed { indice, pestana ->
-                    NavigationBarItem(
-                        selected = pestanaActual == indice,
-                        onClick = {
-                            // Cerrar cualquier detalle/paso intermedio para que el botón
-                            // lleve de verdad a la pestaña tocada (antes había que usar "atrás").
-                            when (Pestana.entries[indice]) {
-                                Pestana.BUSCAR -> scanViewModel.irABuscar()
-                                Pestana.RESULTADOS -> scanViewModel.irAResultados()
-                                Pestana.VERIFICADOR -> if (pestanaActual == indice) verificadorViewModel.nueva()
-                                Pestana.AJUSTES -> Unit
-                            }
-                            pestanaActual = indice
-                        },
-                        icon = { Text(pestana.icono) },
-                        label = { Text(pestana.etiqueta) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = AcentoApp,
-                            selectedTextColor = AcentoApp,
-                            indicatorColor = AcentoSuaveApp,
-                            unselectedIconColor = TextoTerciarioApp,
-                            unselectedTextColor = TextoTerciarioApp,
-                        ),
-                    )
-                }
-            }
+            com.jox3.scanner.ui.common.BarraInferiorHud(
+                etiquetas = Pestana.entries.map { it.etiqueta },
+                iconos = Pestana.entries.map { it.icono },
+                seleccionado = pestanaActual,
+                onSeleccionar = { indice ->
+                    // Cerrar cualquier detalle/paso intermedio para que el botón
+                    // lleve de verdad a la pestaña tocada (antes había que usar "atrás").
+                    when (Pestana.entries[indice]) {
+                        Pestana.BUSCAR -> scanViewModel.irABuscar()
+                        Pestana.RESULTADOS -> scanViewModel.irAResultados()
+                        Pestana.VERIFICADOR -> if (pestanaActual == indice) verificadorViewModel.nueva()
+                        Pestana.AJUSTES -> Unit
+                    }
+                    pestanaActual = indice
+                },
+            )
         },
     ) { paddingInterno ->
         Column(modifier = Modifier.fillMaxSize().padding(paddingInterno)) {
@@ -346,6 +333,7 @@ private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlo
                     onCompartirRegistro = { compartirRegistro(contexto, estado.errores, estado.diagnostico, estado.registro) },
                     onListaElegida = viewModel::abrirDetalle,
                     nombreArchivo = estado.nombreArchivo,
+                    resumen = estado.resumen,
                 )
             }
         }
@@ -362,6 +350,7 @@ private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlo
                 chatLeyendo = estado.chatLeyendo,
                 mensajesChatActual = estado.mensajesChatActual,
                 mensajesTotales = estado.mensajesChatsTerminados,
+                resumen = estado.resumen,
                 onDetener = viewModel::detenerYVerParciales,
                 onCompartirRegistro = { compartirRegistro(contexto, estado.errores, estado.diagnostico, estado.registro) },
             )
@@ -478,6 +467,7 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                 chatLeyendo = s.chatLeyendo,
                 mensajesChatActual = s.mensajesChatActual,
                 mensajesTotales = s.mensajesChatsTerminados,
+                resumen = s.resumen,
                 onDetener = viewModel::detenerYVerParciales,
                 onCompartirRegistro = { compartirRegistro(contexto, s.errores, s.diagnostico, s.registro) },
             )
@@ -506,6 +496,7 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                     onCompartirRegistro = { compartirRegistro(contexto, s.errores, s.diagnostico, s.registro) },
                     onListaElegida = viewModel::abrirDetalle,
                     nombreArchivo = s.nombreArchivo,
+                    resumen = s.resumen,
                 )
             }
         }
@@ -529,12 +520,14 @@ private fun ResultsScreenConectada(
     onCompartirRegistro: (() -> Unit)? = null,
     onListaElegida: (ListaValidada) -> Unit = {},
     nombreArchivo: String = "Resultados_IPTV",
+    resumen: com.jox3.scanner.scan.ResumenEscaneo? = null,
 ) {
     val contexto = LocalContext.current
     val credencialesBot = remember { CredencialesBotTelegram(contexto) }
     val scope = rememberCoroutineScope()
 
     ResultsScreen(
+        resumen = resumen,
         listas = listas,
         errores = errores,
         diagnostico = diagnostico,

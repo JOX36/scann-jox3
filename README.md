@@ -687,6 +687,13 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - Cifras en fuente monoespaciada, bordes con brillo esmeralda y tarjetas de resultado con borde por estado (verde / amarillo por vencer / rojo expirada) y barra de % LATAM.
 - Limpieza de código muerto (UpdateBanner, PanelColapsable, FakeTelegramAuthClient y funciones sin uso).
 
+## Etapa 30 — Resumen final, barra inferior de cristal y arranque sin repeticiones
+
+- **Resumen del escaneo** al terminar (o detener): escaneadas, ON, OFF, latinas, no latinas, España, por vencer, mensajes leídos y duración, con % de listas activas. Cuenta TODAS las listas validadas (antes las caídas se descartaban en modo LATINO y siempre salían en 0). El contador en vivo del escaneo usa los mismos datos.
+- **Colores con significado fijo**: verde = activa, rojo = caída, turquesa = LATAM (antes era amarillo, igual que "por vencer"), violeta = España, amarillo = por vencer.
+- **Barra inferior nueva**: cápsula de cristal con borde brillante, iconos vectoriales y píldora con degradado y resplandor en la pestaña activa (adiós a los emojis de colores sobre gris plano).
+- **Rotación**: la Activity ya no se recrea al girar la pantalla (`configChanges`), así que no se reinicia nada. La animación de bienvenida solo aparece en el arranque en frío del proceso, no al girar ni al reabrir la app con el proceso vivo.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

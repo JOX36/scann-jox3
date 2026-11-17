@@ -139,6 +139,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
                                 validarYEnriquecer(credenciales, origen)
                             } ?: com.jox3.scanner.scan.engine.ListaValidada(credenciales, activa = false, esLatino = false, porcentajeLatino = 0.0, origenChat = origen)
                             if (validada.activa) activas.incrementAndGet()
+                            send(EventoEscaneo.Validada(validada.activa, validada.esLatino, validada.esEspana))
                             registrar(
                                 if (validada.activa) "✅ Activa: ${validada.credenciales.host} (desde \"$origen\")"
                                 else "❌ Inactiva/caída: ${validada.credenciales.host} (desde \"$origen\")"
