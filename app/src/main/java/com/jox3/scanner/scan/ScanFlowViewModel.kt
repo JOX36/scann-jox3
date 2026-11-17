@@ -3,6 +3,7 @@ package com.jox3.scanner.scan
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.jox3.scanner.results.ResultadosExportador
 import com.jox3.scanner.scan.data.ChatTelegram
 import com.jox3.scanner.scan.data.TemaChat
 import com.jox3.scanner.scan.data.TipoChat
@@ -106,6 +107,8 @@ sealed class EstadoFlujoEscaneo {
         val errores: List<String> = emptyList(),
         val diagnostico: List<String> = emptyList(),
         val registro: List<String> = emptyList(),
+        /** Nombre base del .txt/Telegram, p. ej. "Resultados_Latinos_G-PANDORA" (igual que en el script de Python). */
+        val nombreArchivo: String = "Resultados_IPTV",
     ) : EstadoFlujoEscaneo()
 }
 
@@ -141,6 +144,8 @@ class ScanFlowViewModel(
     private val _detalleCargando = MutableStateFlow(false)
     val detalleCargando: StateFlow<Boolean> = _detalleCargando.asStateFlow()
     private var detalleJob: Job? = null
+
+    private var nombreArchivoActual = "Resultados_IPTV"
 
     // Último resultado de escaneo: la pestaña "Resultados" lo muestra aunque
     // la pestaña "Buscar" haya vuelto al menú de modos (antes ambas leían el
@@ -324,6 +329,7 @@ class ScanFlowViewModel(
 
     /** Escanea un archivo .txt local, ya leído por la UI vía Storage Access Framework. */
     fun escanearArchivoLocal(nombreArchivo: String, contenido: String) {
+        nombreArchivoActual = "Resultados_Latinos_" + ResultadosExportador.nombreArchivoSeguro(nombreArchivo.substringBeforeLast('.'))
         encontradasActuales = emptyList()
         erroresActuales = emptyList()
         diagnosticoActual = emptyList()
@@ -341,6 +347,13 @@ class ScanFlowViewModel(
     }
 
     private fun iniciarEscaneo(chats: List<ChatTelegram>, filtroHost: String?, soloLatino: Boolean) {
+        // Mismos nombres que el script de Python: Resultados_<host>.txt / Resultados_Latinos_<chat>.txt
+        nombreArchivoActual = when {
+            filtroHost != null -> "Resultados_" + ResultadosExportador.nombreArchivoSeguro(filtroHost)
+            soloLatino -> "Resultados_Latinos_" +
+                if (chats.size == 1) ResultadosExportador.nombreArchivoSeguro(chats[0].titulo) else "varios_chats"
+            else -> "Resultados_IPTV"
+        }
         encontradasActuales = emptyList()
         erroresActuales = emptyList()
         diagnosticoActual = emptyList()
@@ -366,7 +379,7 @@ class ScanFlowViewModel(
     fun detenerYVerParciales() {
         scanJob?.cancel()
         scanJob = null
-        val parcial = EstadoFlujoEscaneo.Resultados(encontradasActuales, erroresActuales, diagnosticoActual, registroActual)
+        val parcial = EstadoFlujoEscaneo.Resultados(encontradasActuales, erroresActuales, diagnosticoActual, registroActual, nombreArchivoActual)
         _ultimoResultado.value = parcial
         _estado.value = parcial
     }
@@ -446,6 +459,7 @@ class ScanFlowViewModel(
                     errores.toList(),
                     diagnostico.toList(),
                     registro.toList(),
+                    nombreArchivoActual,
                 )
                 _ultimoResultado.value = resultadoFinal
                 _estado.value = resultadoFinal

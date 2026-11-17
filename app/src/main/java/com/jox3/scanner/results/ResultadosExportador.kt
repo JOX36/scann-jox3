@@ -33,6 +33,10 @@ object ResultadosExportador {
         else -> "🟢"
     }
 
+    /** " categorías · 5230 canales" si se conoce el total; vacío si no (el conteo falló). */
+    private fun totalTexto(total: Int?, nombre: String): String =
+        if (total != null) " categorías · $total $nombre" else ""
+
     fun epgLink(cred: CredencialesXtream): String =
         "${cred.host}/xmltv.php?username=${cred.username}&password=${cred.password}"
 
@@ -144,11 +148,11 @@ object ResultadosExportador {
         }
         builder.appendLine()
         if (detalle != null) {
-            builder.appendLine("📡 TV en vivo (${detalle.categoriasLive.size}): ${detalle.categoriasLive.joinToString(", ")}")
+            builder.appendLine("📡 TV en vivo (${detalle.categoriasLive.size}${totalTexto(lista.cantidadCanales, "canales")}): ${detalle.categoriasLive.joinToString(", ")}")
             builder.appendLine()
-            builder.appendLine("🎬 Series (${detalle.categoriasSeries.size}): ${detalle.categoriasSeries.joinToString(", ")}")
+            builder.appendLine("🎬 Series (${detalle.categoriasSeries.size}${totalTexto(lista.cantidadSeries, "series")}): ${detalle.categoriasSeries.joinToString(", ")}")
             builder.appendLine()
-            builder.appendLine("🎥 Películas (${detalle.categoriasPeliculas.size}): ${detalle.categoriasPeliculas.joinToString(", ")}")
+            builder.appendLine("🎥 Películas (${detalle.categoriasPeliculas.size}${totalTexto(lista.cantidadPeliculas, "películas")}): ${detalle.categoriasPeliculas.joinToString(", ")}")
             builder.appendLine()
         }
         if (lista.origenChat == "Verificador") {
@@ -162,11 +166,23 @@ object ResultadosExportador {
     }
 
     /** Escribe el archivo en la carpeta externa de la app (ya expuesta por [FileProvider]) y lo devuelve. */
-    fun guardarArchivo(context: Context, listas: List<ListaValidada>): File {
+    fun guardarArchivo(context: Context, listas: List<ListaValidada>, nombreBase: String = "Resultados_IPTV"): File {
         val carpeta = context.getExternalFilesDir(null) ?: context.filesDir
-        val archivo = File(carpeta, "Resultados_IPTV.txt")
+        val archivo = File(carpeta, "$nombreBase.txt")
         archivo.writeText(generarContenido(listas))
         return archivo
+    }
+
+    /**
+     * Nombre de archivo solo-ASCII a partir de un nombre de chat/archivo
+     * (puede traer emojis o símbolos) — puerto de `nombre_archivo_seguro()`
+     * de Python: "👩‍🎤 G-PANDORA 👩‍🎤" → "G-PANDORA".
+     */
+    fun nombreArchivoSeguro(texto: String, maxLen: Int = 60): String {
+        val ascii = java.text.Normalizer.normalize(texto, java.text.Normalizer.Form.NFKD)
+            .filter { it.code < 128 }
+        val limpio = ascii.replace(Regex("[^A-Za-z0-9_-]+"), "_").trim('_')
+        return limpio.ifEmpty { "chat" }.take(maxLen)
     }
 
     /** Igual que [guardarArchivo] pero para una sola lista con su detalle (ver [generarContenidoDetalle]). */

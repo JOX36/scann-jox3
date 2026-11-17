@@ -3,6 +3,7 @@ package com.jox3.scanner.scan.engine
 import com.jox3.scanner.scan.data.CredencialesXtream
 import com.jox3.scanner.update.NetworkModule
 import io.ktor.client.call.body
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import kotlinx.coroutines.CancellationException
@@ -205,6 +206,7 @@ object XtreamClient {
                 parameter("username", cred.username)
                 parameter("password", cred.password)
                 parameter("action", "get_live_streams")
+                timeout { requestTimeoutMillis = TIMEOUT_LISTADO_GRANDE_MS; socketTimeoutMillis = TIMEOUT_LISTADO_GRANDE_MS }
             }.body()
             canales.mapNotNull { it.name }
         }.getOrDefault(emptyList())
@@ -223,6 +225,7 @@ object XtreamClient {
                 parameter("username", cred.username)
                 parameter("password", cred.password)
                 parameter("action", accion)
+                timeout { requestTimeoutMillis = TIMEOUT_LISTADO_GRANDE_MS; socketTimeoutMillis = TIMEOUT_LISTADO_GRANDE_MS }
             }.body()
             elementos.size
         }.getOrNull()
@@ -265,6 +268,13 @@ object XtreamClient {
     // lento, sino porque el hilo/conexión que la hace está ocupado con
     // otra cosa. 4s alcanzaba a cortarla antes de que arrancara de verdad.
     private const val TIMEOUT_DNS_MS = 12_000L
+
+    /**
+     * Listados completos (canales, películas, series): en paneles grandes pesan
+     * varios MB y con el timeout general de 10 s se cortaban, dejando
+     * "Canales/Series/Películas: N/A" aunque el panel sí respondía.
+     */
+    private const val TIMEOUT_LISTADO_GRANDE_MS = 60_000L
 
     /**
      * Resuelve la IP real del servidor detrás del host de la lista (pedido

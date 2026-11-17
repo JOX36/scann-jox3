@@ -636,6 +636,12 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - **IP alternativa**: solo IPv4 y se omite si es de Cloudflare (antes salía una IPv6 sin corchetes, enlace inválido, y la IP de un proxy).
 - Pendiente de decidir: opción "cualquier español" (incluir también España) como interruptor.
 
+## Etapa 23
+
+- **"N/A" en Canales/Series/Películas**: los listados completos (`get_live_streams`, `get_vod_streams`, `get_series`) pesan varios MB en paneles grandes y se cortaban con el timeout general de 10 s. Ahora esas tres peticiones tienen 60 s. El detalle también muestra los totales: `📡 TV en vivo (118 categorías · 5230 canales)`.
+- **Nombre del archivo como en el script de Python**: `Resultados_Latinos_<chat>.txt` (p. ej. `Resultados_Latinos_G-PANDORA`), `Resultados_<host>.txt` en búsquedas por host y `Resultados_Latinos_<archivo>.txt` para un .txt local; al enviarlo a Telegram lleva ese nombre como texto de pie ("Resultados Latinos G-PANDORA").
+- **Una sola lista (Verificar / detalle)**: "Enviar a Telegram" manda el resultado **suelto como mensaje(s) de texto**, no como .txt. Telegram admite 4096 caracteres por mensaje; si es más largo se divide por líneas (3800 c/u, marcados `(1/3)`, con 0,4 s entre envíos).
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

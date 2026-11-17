@@ -308,6 +308,7 @@ private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlo
                     onEscanearDeNuevo = viewModel::reiniciar,
                     onCompartirRegistro = { compartirRegistro(contexto, estado.errores, estado.diagnostico, estado.registro) },
                     onListaElegida = viewModel::abrirDetalle,
+                    nombreArchivo = estado.nombreArchivo,
                 )
             }
         }
@@ -467,6 +468,7 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                     onEscanearDeNuevo = viewModel::reiniciar,
                     onCompartirRegistro = { compartirRegistro(contexto, s.errores, s.diagnostico, s.registro) },
                     onListaElegida = viewModel::abrirDetalle,
+                    nombreArchivo = s.nombreArchivo,
                 )
             }
         }
@@ -489,6 +491,7 @@ private fun ResultsScreenConectada(
     onEscanearDeNuevo: () -> Unit,
     onCompartirRegistro: (() -> Unit)? = null,
     onListaElegida: (ListaValidada) -> Unit = {},
+    nombreArchivo: String = "Resultados_IPTV",
 ) {
     val contexto = LocalContext.current
     val credencialesBot = remember { CredencialesBotTelegram(contexto) }
@@ -503,7 +506,7 @@ private fun ResultsScreenConectada(
         onCompartirRegistro = onCompartirRegistro,
         onListaElegida = onListaElegida,
         onGuardarTxt = {
-            val archivo = ResultadosExportador.guardarArchivo(contexto, listas)
+            val archivo = ResultadosExportador.guardarArchivo(contexto, listas, nombreArchivo)
             ResultadosExportador.compartirArchivo(contexto, archivo)
         },
         onEnviarTelegram = {
@@ -512,9 +515,9 @@ private fun ResultsScreenConectada(
             if (token.isNullOrBlank() || chatId.isNullOrBlank()) {
                 Toast.makeText(contexto, "Configura el bot de Telegram en Ajustes primero.", Toast.LENGTH_LONG).show()
             } else {
-                val archivo = ResultadosExportador.guardarArchivo(contexto, listas)
+                val archivo = ResultadosExportador.guardarArchivo(contexto, listas, nombreArchivo)
                 scope.launch {
-                    val error = TelegramBotClient.enviarArchivo(token, chatId, archivo)
+                    val error = TelegramBotClient.enviarArchivo(token, chatId, archivo, caption = nombreArchivo.replace('_', ' '))
                     val mensaje = error?.let { "No se pudo enviar: $it" } ?: "Enviado a Telegram."
                     Toast.makeText(contexto, mensaje, Toast.LENGTH_LONG).show()
                 }
@@ -567,9 +570,10 @@ private fun DetalleListaConectada(
                 if (token.isNullOrBlank() || chatId.isNullOrBlank()) {
                     Toast.makeText(contexto, "Configura el bot de Telegram en Ajustes primero.", Toast.LENGTH_LONG).show()
                 } else {
-                    val archivo = ResultadosExportador.guardarArchivoDetalle(contexto, lista, detalle)
+                    // Una sola lista: llega suelta como mensaje(s) de texto (dividido si es largo), no como .txt.
+                    val texto = ResultadosExportador.generarContenidoDetalle(lista, detalle)
                     scope.launch {
-                        val error = TelegramBotClient.enviarArchivo(token, chatId, archivo)
+                        val error = TelegramBotClient.enviarTexto(token, chatId, texto)
                         val mensaje = error?.let { "No se pudo enviar: $it" } ?: "Enviado a Telegram."
                         Toast.makeText(contexto, mensaje, Toast.LENGTH_LONG).show()
                     }
