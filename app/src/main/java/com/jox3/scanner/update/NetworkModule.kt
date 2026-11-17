@@ -15,6 +15,12 @@ import kotlinx.serialization.json.Json
 object NetworkModule {
     val cliente: HttpClient by lazy {
         HttpClient(Android) {
+            // El motor Android usa solo 4 hilos por defecto y cada petición los bloquea (DNS/conexión
+            // a paneles caídos incluidos): con decenas de validaciones a la vez todo se encolaba y el
+            // escaneo parecía congelado. Más hilos = las peticiones lentas ya no frenan a las demás.
+            engine {
+                threadsCount = 64
+            }
             // Sin esto, una llamada a un panel caído/colgado (muy común
             // entre decenas de enlaces reales: paneles vencidos que ni
             // siquiera rechazan la conexión, solo nunca responden) se queda

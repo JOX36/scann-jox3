@@ -134,7 +134,10 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
                         if (credenciales == null) {
                             registrar("⚠️ Enlace sin usuario/contraseña reconocible (desde \"$origen\"): $enlace")
                         } else {
-                            val validada = validarYEnriquecer(credenciales, origen)
+                            // Tope de seguridad: una lista que se cuelga no debe retener su turno (permiso) para siempre.
+                            val validada = kotlinx.coroutines.withTimeoutOrNull(TIMEOUT_VALIDACION_MS) {
+                                validarYEnriquecer(credenciales, origen)
+                            } ?: ListaValidada(credenciales, activa = false, esLatino = false, porcentajeLatino = 0.0, origenChat = origen)
                             if (validada.activa) activas.incrementAndGet()
                             registrar(
                                 if (validada.activa) "✅ Activa: ${validada.credenciales.host} (desde \"$origen\")"
@@ -458,5 +461,6 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
         const val PAUSA_ENTRE_PAGINAS_MS = 250L
         const val LOTE_TEMAS = 100
         const val MAX_VALIDACIONES_EN_PARALELO = 50
+        private const val TIMEOUT_VALIDACION_MS = 150_000L
     }
 }

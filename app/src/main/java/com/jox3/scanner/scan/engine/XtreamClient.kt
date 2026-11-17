@@ -9,7 +9,7 @@ import io.ktor.client.request.parameter
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.isSuccess
-import io.ktor.utils.io.jvm.javaio.toInputStream
+import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -226,9 +226,28 @@ object XtreamClient {
                 if (!respuesta.status.isSuccess()) {
                     null
                 } else {
-                    withContext(Dispatchers.IO) {
-                        respuesta.bodyAsChannel().toInputStream().reader(Charsets.UTF_8).use { resumirArrayJson(it, maxNombres) }
+                    // Lectura SUSPENDIBLE (sin bloquear hilos y cancelable por timeout), decodificando UTF-8 por trozos.
+                    val canal = respuesta.bodyAsChannel()
+                    val resumidor = ResumidorArrayJson(maxNombres)
+                    val decodificador = Charsets.UTF_8.newDecoder()
+                        .onMalformedInput(java.nio.charset.CodingErrorAction.REPLACE)
+                        .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPLACE)
+                    val bytes = ByteArray(8192)
+                    val bb = java.nio.ByteBuffer.wrap(bytes)
+                    val cb = java.nio.CharBuffer.allocate(8192)
+                    while (true) {
+                        val n = canal.readAvailable(bytes, bb.position(), bytes.size - bb.position())
+                        if (n < 0) break
+                        bb.position(bb.position() + n)
+                        bb.flip()
+                        decodificador.decode(bb, cb, false)
+                        bb.compact()
+                        cb.flip()
+                        val listo = resumidor.alimentar(cb.array(), cb.limit())
+                        cb.clear()
+                        if (listo) break
                     }
+                    resumidor.resultado()
                 }
             }
         } catch (e: CancellationException) {

@@ -672,6 +672,12 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - Ahora esos listados se leen en streaming (`resumirArrayJson`): solo se cuenta cuántos elementos hay y se guarda una muestra de 300 nombres para la detección LATAM. El uso de memoria ya no depende del tamaño del panel.
 - `largeHeap` activado como margen extra.
 
+## Etapa 28 — Escaneo que se quedaba "congelado"
+
+- El motor de red usaba solo 4 hilos bloqueantes; con 50 validaciones a la vez las peticiones a paneles caídos/lentos se encolaban y el progreso parecía detenido (p. ej. "70 de 2478"). Ahora 64 hilos.
+- La lectura de canales/películas/series es suspendible (no bloquea hilos y respeta los timeouts).
+- Tope de 150 s por lista: una que se cuelgue ya no retiene su turno para siempre.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

@@ -16,24 +16,25 @@ class ResumenArrayJson(val cantidad: Int, val nombres: List<String>)
  *
  * Devuelve `null` si el contenido no es un array JSON (p. ej. un error en HTML o un objeto).
  */
-fun resumirArrayJson(lector: Reader, maxNombres: Int): ResumenArrayJson? {
-    val buffer = CharArray(8192)
-    val nombres = ArrayList<String>()
-    var profundidad = 0
-    var empezo = false
-    var enCadena = false
-    var escape = false
-    var unicodePendiente = 0
-    var unicodeValor = 0
-    val cadena = StringBuilder()
-    var ultimoSig = ' ' // último carácter significativo antes de abrir la cadena actual
-    var previoAlAbrir = ' '
-    var claveActual = ""
-    var cantidad = 0
+class ResumidorArrayJson(private val maxNombres: Int) {
+    private val nombres = ArrayList<String>()
+    private var profundidad = 0
+    private var empezo = false
+    private var enCadena = false
+    private var escape = false
+    private var unicodePendiente = 0
+    private var unicodeValor = 0
+    private val cadena = StringBuilder()
+    private var ultimoSig = ' ' // último carácter significativo antes de abrir la cadena actual
+    private var previoAlAbrir = ' '
+    private var claveActual = ""
+    private var cantidad = 0
+    private var terminado = false
+    private var invalido = false
 
-    while (true) {
-        val n = lector.read(buffer)
-        if (n < 0) break
+    /** Procesa [n] caracteres de [buffer]. Devuelve `true` cuando ya no hace falta leer más (array cerrado o contenido inválido). */
+    fun alimentar(buffer: CharArray, n: Int): Boolean {
+        if (terminado || invalido) return true
         for (i in 0 until n) {
             val c = buffer[i]
             if (enCadena) {
@@ -66,29 +67,48 @@ fun resumirArrayJson(lector: Reader, maxNombres: Int): ResumenArrayJson? {
                 continue
             }
             when (c) {
-                ' ', '\n', '\r', '\t', '﻿' -> {}
+                ' ', '\n', '\r', '\t', '\uFEFF' -> {}
                 '"' -> {
-                    if (!empezo) return null
+                    if (!empezo) { invalido = true; return true }
                     enCadena = true
                     previoAlAbrir = ultimoSig
                     cadena.setLength(0)
                 }
                 '[', '{' -> {
                     if (!empezo) {
-                        if (c != '[') return null
+                        if (c != '[') { invalido = true; return true }
                         empezo = true
                     }
                     profundidad++
                     if (profundidad == 2 && c == '{') cantidad++
                     ultimoSig = c
                 }
-                ']', '}' -> { profundidad--; ultimoSig = c; if (profundidad <= 0) return ResumenArrayJson(cantidad, nombres) }
+                ']', '}' -> {
+                    profundidad--
+                    ultimoSig = c
+                    if (profundidad <= 0) { terminado = true; return true }
+                }
                 else -> {
-                    if (!empezo) return null
+                    if (!empezo) { invalido = true; return true }
                     ultimoSig = if (c == ',' || c == ':') c else 'x'
                 }
             }
         }
+        return false
     }
-    return if (empezo && profundidad == 0) ResumenArrayJson(cantidad, nombres) else null
+
+    fun resultado(): ResumenArrayJson? =
+        if (!invalido && empezo && (terminado || profundidad == 0)) ResumenArrayJson(cantidad, nombres) else null
+}
+
+/** Versión bloqueante para un [Reader] (usada en pruebas o fuentes locales). */
+fun resumirArrayJson(lector: Reader, maxNombres: Int): ResumenArrayJson? {
+    val r = ResumidorArrayJson(maxNombres)
+    val buffer = CharArray(8192)
+    while (true) {
+        val n = lector.read(buffer)
+        if (n < 0) break
+        if (r.alimentar(buffer, n)) break
+    }
+    return r.resultado()
 }
