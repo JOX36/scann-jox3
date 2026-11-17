@@ -44,28 +44,39 @@ object TelegramBotClient {
         }.getOrElse { e -> e.message ?: "Error desconocido enviando a Telegram" }
     }
 
-    /** Límite de Telegram por mensaje: 4096 caracteres; se deja margen por emojis/numeración. */
-    private const val MAX_CARACTERES_MENSAJE = 3800
+    /** Límite de Telegram por mensaje: 4096 caracteres; se deja margen por emojis. */
+    private const val MAX_CARACTERES_MENSAJE = 4000
 
-    /** Parte [texto] en trozos de a lo más [limite] caracteres, cortando por líneas (y por palabras/caracteres si una línea sola es más larga). */
+    /**
+     * Divide un informe en mensajes: uno por bloque (separados por línea en blanco:
+     * datos de la cuenta, TV en vivo, Series, Películas…). El pie final (pocas líneas)
+     * se pega al bloque anterior si cabe. Un bloque que por sí solo pasa el límite
+     * se parte en la última coma posible; sin numeración — son un mismo informe.
+     */
     fun dividirTexto(texto: String, limite: Int = MAX_CARACTERES_MENSAJE): List<String> {
-        val trozos = mutableListOf<String>()
-        val actual = StringBuilder()
-        fun cerrar() { if (actual.isNotBlank()) trozos += actual.toString().trimEnd(); actual.clear() }
-        for (linea in texto.lines()) {
-            var resto = linea
-            while (resto.length > limite) {
-                // línea gigante (p. ej. cientos de categorías separadas por coma): cortar en la última ", " posible
-                val corte = resto.lastIndexOf(", ", limite).takeIf { it > limite / 2 }?.plus(2) ?: limite
-                cerrar()
-                trozos += resto.substring(0, corte).trimEnd()
-                resto = resto.substring(corte)
+        val bloques = texto.trim().split(Regex("\n\\s*\n")).map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+        // pie ("🔍 Verificada…/📅 Escaneado…") → junto al bloque anterior si cabe
+        if (bloques.size >= 2) {
+            val pie = bloques.last()
+            val anterior = bloques[bloques.size - 2]
+            if (pie.lines().size <= 3 && anterior.length + pie.length + 2 <= limite) {
+                bloques.removeAt(bloques.size - 1)
+                bloques[bloques.size - 1] = anterior + "\n\n" + pie
             }
-            if (actual.length + resto.length + 1 > limite) cerrar()
-            actual.append(resto).append('\n')
         }
-        cerrar()
-        return trozos
+        val mensajes = mutableListOf<String>()
+        for (bloque in bloques) {
+            var resto = bloque
+            while (resto.length > limite) {
+                val corte = resto.lastIndexOf(", ", limite).takeIf { it > limite / 2 }?.plus(2)
+                    ?: resto.lastIndexOf('\n', limite).takeIf { it > limite / 2 }?.plus(1)
+                    ?: limite
+                mensajes += resto.substring(0, corte).trimEnd()
+                resto = resto.substring(corte).trimStart()
+            }
+            if (resto.isNotEmpty()) mensajes += resto
+        }
+        return mensajes
     }
 
     /**
@@ -75,7 +86,7 @@ object TelegramBotClient {
     suspend fun enviarTexto(botToken: String, chatId: String, texto: String): String? {
         val partes = dividirTexto(texto)
         partes.forEachIndexed { indice, parte ->
-            val cuerpo = if (partes.size > 1) "(${indice + 1}/${partes.size})\n$parte" else parte
+            val cuerpo = parte
             val error = runCatching {
                 val respuesta = NetworkModule.cliente.submitForm(
                     url = "https://api.telegram.org/bot$botToken/sendMessage",
