@@ -137,7 +137,7 @@ class TdEscanerRepository(private val sesion: TdLibAuthClient) : EscanerReposito
                             // Tope de seguridad: una lista que se cuelga no debe retener su turno (permiso) para siempre.
                             val validada = kotlinx.coroutines.withTimeoutOrNull(TIMEOUT_VALIDACION_MS) {
                                 validarYEnriquecer(credenciales, origen)
-                            } ?: ListaValidada(credenciales, activa = false, esLatino = false, porcentajeLatino = 0.0, origenChat = origen)
+                            } ?: com.jox3.scanner.scan.engine.ListaValidada(credenciales, activa = false, esLatino = false, porcentajeLatino = 0.0, origenChat = origen)
                             if (validada.activa) activas.incrementAndGet()
                             registrar(
                                 if (validada.activa) "✅ Activa: ${validada.credenciales.host} (desde \"$origen\")"
