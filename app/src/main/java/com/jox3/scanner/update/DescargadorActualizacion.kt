@@ -66,7 +66,7 @@ class DescargadorActualizacion(private val contexto: Context) {
         val manager = contexto.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
         val solicitud = DownloadManager.Request(Uri.parse(urlApk))
-            .setTitle("IPTV Scanner $version")
+            .setTitle("JOX3 Radar $version")
             .setDescription("Descargando actualización...")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalFilesDir(

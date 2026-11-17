@@ -73,7 +73,7 @@ class ServicioEscaneo : Service() {
             }
             return NotificationCompat.Builder(contexto, CANAL)
                 .setSmallIcon(android.R.drawable.stat_sys_download)
-                .setContentTitle("IPTV Scanner escaneando")
+                .setContentTitle("JOX3 Radar escaneando")
                 .setContentText(texto)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)

@@ -121,6 +121,10 @@ class MainActivity : ComponentActivity() {
                             PantallaPrincipal(authClient)
                         }
                     }
+                    var mostrarInicio by remember { mutableStateOf(true) }
+                    if (mostrarInicio) {
+                        com.jox3.scanner.ui.common.PantallaInicio(onTerminado = { mostrarInicio = false })
+                    }
                 }
             }
         }

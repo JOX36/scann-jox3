@@ -154,10 +154,10 @@ fun ResultsScreen(
 
 @Composable
 private fun EstadisticaChip(etiqueta: String, valor: String, colorValor: Color, modifier: Modifier = Modifier) {
-    Surface(color = SuperficieApp, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, BordeApp), modifier = modifier) {
+    Surface(color = SuperficieApp, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, com.jox3.scanner.ui.theme.BordeHud), modifier = modifier) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Text(valor, color = colorValor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text(etiqueta, color = TextoSecundario, fontSize = 11.sp)
+            Text(valor, color = colorValor, fontSize = 24.sp, fontWeight = FontWeight.Bold, fontFamily = com.jox3.scanner.ui.common.FuenteHud)
+            Text(etiqueta.uppercase(), color = TextoSecundario, fontSize = 10.sp, letterSpacing = 1.sp)
         }
     }
 }
@@ -192,7 +192,15 @@ internal fun FilaResultado(lista: ListaValidada, onClick: (() -> Unit)? = null) 
     Surface(
         color = SuperficieApp,
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, BordeApp),
+        border = BorderStroke(
+            1.dp,
+            when {
+                lista.diasRestantes == null -> BordeApp
+                lista.diasRestantes < 0 -> ErrorApp.copy(alpha = 0.55f)
+                lista.diasRestantes < UMBRAL_POR_VENCER -> AmarilloApp.copy(alpha = 0.55f)
+                else -> AcentoApp.copy(alpha = 0.40f)
+            },
+        ),
         onClick = onClick ?: {},
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
     ) {
@@ -219,6 +227,13 @@ internal fun FilaResultado(lista: ListaValidada, onClick: (() -> Unit)? = null) 
             if (lista.esLatino) {
                 Spacer(Modifier.height(4.dp))
                 Text("🌎 LATAM · ${(lista.porcentajeLatino * 100).toInt()}%", color = AcentoApp, fontSize = 12.sp)
+                Spacer(Modifier.height(3.dp))
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = lista.porcentajeLatino.toFloat().coerceIn(0f, 1f),
+                    color = AcentoApp,
+                    trackColor = AcentoApp.copy(alpha = 0.15f),
+                    modifier = Modifier.fillMaxWidth().height(3.dp),
+                )
             }
             if (lista.esEspana) {
                 Spacer(Modifier.height(4.dp))
@@ -242,6 +257,6 @@ private fun InsigniaVencimiento(diasRestantes: Int?) {
         else -> "$diasRestantes días" to AcentoApp
     }
     Surface(color = color.copy(alpha = 0.18f), shape = RoundedCornerShape(50)) {
-        Text(texto, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
+        Text(texto, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = com.jox3.scanner.ui.common.FuenteHud, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
     }
 }

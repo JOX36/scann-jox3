@@ -28,7 +28,7 @@ fun LoginScreen(viewModel: LoginViewModel, onAutenticado: () -> Unit) {
             .padding(horizontal = 24.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("IPTV Scanner", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text(com.jox3.scanner.ui.common.NOMBRE_APP, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
         Text("Inicia sesión con tu cuenta de Telegram", color = TextoSecundario, fontSize = 13.sp)
         Spacer(Modifier.height(32.dp))

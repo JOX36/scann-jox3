@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,6 +33,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jox3.scanner.scan.engine.ListaValidada
+import com.jox3.scanner.ui.common.FuenteHud
+import com.jox3.scanner.ui.common.RadarAnimado
+import com.jox3.scanner.ui.theme.BordeHud
 import com.jox3.scanner.ui.theme.AcentoApp
 import com.jox3.scanner.ui.theme.BordeApp
 import com.jox3.scanner.ui.theme.ErrorApp
@@ -68,12 +72,32 @@ fun ScanProgressScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-        Text("Escaneando...", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
-        Spacer(Modifier.height(8.dp))
-
         val progreso = if (total > 0) procesados.toFloat() / total else 0f
+        val progresoAnimado by androidx.compose.animation.core.animateFloatAsState(
+            targetValue = progreso,
+            animationSpec = androidx.compose.animation.core.tween(600),
+            label = "progreso",
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RadarAnimado(tamano = 64.dp)
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text("Escaneando...", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
+                if (total > 0) {
+                    Text(
+                        "${(progreso * 100).toInt()}%",
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FuenteHud,
+                        color = AcentoApp,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+
         LinearProgressIndicator(
-            progress = progreso,
+            progress = progresoAnimado,
             color = AcentoApp,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -157,10 +181,10 @@ fun ScanProgressScreen(
 
 @Composable
 private fun EstadisticaCelda(etiqueta: String, valor: String, colorValor: Color, modifier: Modifier = Modifier) {
-    Surface(color = SuperficieApp, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, BordeApp), modifier = modifier) {
+    Surface(color = SuperficieApp, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, BordeHud), modifier = modifier) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Text(etiqueta, color = TextoSecundario, fontSize = 11.sp)
-            Text(valor, color = colorValor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(etiqueta.uppercase(), color = TextoSecundario, fontSize = 10.sp, letterSpacing = 1.sp)
+            Text(valor, color = colorValor, fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = FuenteHud)
         }
     }
 }

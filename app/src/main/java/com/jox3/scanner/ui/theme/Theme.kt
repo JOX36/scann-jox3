@@ -27,6 +27,9 @@ val OnAcentoApp = Color(0xFF06231F) // texto oscuro sobre fondos con AcentoApp
 /** Degradado esmeralda→turquesa para los chips de ícono "destacados" (igual que en el preview elegido). */
 val DegradadoAcento = Brush.linearGradient(listOf(AcentoApp, AcentoSecundario))
 
+/** Borde "HUD": brillo esmeralda en la esquina superior que se apaga hacia la inferior. */
+val BordeHud = Brush.linearGradient(listOf(AcentoApp.copy(alpha = 0.55f), BordeApp, BordeApp))
+
 private val EsquemaOscuro = darkColorScheme(
     primary = AcentoApp,
     background = FondoApp,

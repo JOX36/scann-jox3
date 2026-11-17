@@ -21,7 +21,9 @@
     <application
         android:largeHeap="true"
         android:allowBackup="false"
-        android:label="IPTV Scanner"
+        android:label="JOX3 Radar"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         tools:replace="android:allowBackup,android:label"
         android:usesCleartextTraffic="true">

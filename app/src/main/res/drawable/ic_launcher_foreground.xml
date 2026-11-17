@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Anillos del radar -->
+    <path android:strokeColor="#662EE6A8" android:strokeWidth="1.6" android:fillColor="#00000000"
+        android:pathData="M54,54m-30,0a30,30 0,1 1,60 0a30,30 0,1 1,-60 0" />
+    <path android:strokeColor="#662EE6A8" android:strokeWidth="1.6" android:fillColor="#00000000"
+        android:pathData="M54,54m-20,0a20,20 0,1 1,40 0a20,20 0,1 1,-40 0" />
+    <path android:strokeColor="#662EE6A8" android:strokeWidth="1.6" android:fillColor="#00000000"
+        android:pathData="M54,54m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0" />
+    <!-- Barrido -->
+    <path android:fillColor="#552EE6A8"
+        android:pathData="M54,54L54,24A30,30 0,0 1,80,39Z" />
+    <path android:strokeColor="#FF2EE6A8" android:strokeWidth="2.4" android:strokeLineCap="round"
+        android:pathData="M54,54L80,39" />
+    <!-- Objetivo detectado -->
+    <path android:fillColor="#FF22B8CF"
+        android:pathData="M66,36m-3.2,0a3.2,3.2 0,1 1,6.4 0a3.2,3.2 0,1 1,-6.4 0" />
+    <path android:fillColor="#FF2EE6A8"
+        android:pathData="M54,54m-2.6,0a2.6,2.6 0,1 1,5.2 0a2.6,2.6 0,1 1,-5.2 0" />
+</vector>

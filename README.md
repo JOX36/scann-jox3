@@ -678,6 +678,15 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - La lectura de canales/películas/series es suspendible (no bloquea hilos y respeta los timeouts).
 - Tope de 150 s por lista: una que se cuelgue ya no retiene su turno para siempre.
 
+## Etapa 29 — Nombre "JOX3 Radar", ícono y look HUD
+
+- Nombre de la app: **JOX3 Radar** (launcher, login, notificaciones, descargas).
+- Ícono adaptable propio (radar esmeralda sobre fondo oscuro, con versión monocromática para Android 13+).
+- Pantalla de bienvenida animada (~1,7 s) con el radar y el nombre.
+- Escaneo: radar giratorio, porcentaje grande en fuente monoespaciada y barra de progreso animada.
+- Cifras en fuente monoespaciada, bordes con brillo esmeralda y tarjetas de resultado con borde por estado (verde / amarillo por vencer / rojo expirada) y barra de % LATAM.
+- Limpieza de código muerto (UpdateBanner, PanelColapsable, FakeTelegramAuthClient y funciones sin uso).
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
