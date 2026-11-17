@@ -72,7 +72,3 @@ fun analizarContenido(textos: List<String>): AnalisisContenido {
         proporcionEspana = espana,
     )
 }
-
-/** Compatibilidad: `(esLatino, proporcionLatino)`. */
-fun esContenidoLatino(textos: List<String>): Pair<Boolean, Double> =
-    analizarContenido(textos).let { it.esLatino to it.proporcionLatino }

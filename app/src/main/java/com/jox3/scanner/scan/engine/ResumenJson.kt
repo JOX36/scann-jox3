@@ -1,7 +1,5 @@
 package com.jox3.scanner.scan.engine
 
-import java.io.Reader
-
 /** Resultado de recorrer un array JSON sin construirlo en memoria. */
 class ResumenArrayJson(val cantidad: Int, val nombres: List<String>)
 
@@ -99,16 +97,4 @@ class ResumidorArrayJson(private val maxNombres: Int) {
 
     fun resultado(): ResumenArrayJson? =
         if (!invalido && empezo && (terminado || profundidad == 0)) ResumenArrayJson(cantidad, nombres) else null
-}
-
-/** Versión bloqueante para un [Reader] (usada en pruebas o fuentes locales). */
-fun resumirArrayJson(lector: Reader, maxNombres: Int): ResumenArrayJson? {
-    val r = ResumidorArrayJson(maxNombres)
-    val buffer = CharArray(8192)
-    while (true) {
-        val n = lector.read(buffer)
-        if (n < 0) break
-        if (r.alimentar(buffer, n)) break
-    }
-    return r.resultado()
 }

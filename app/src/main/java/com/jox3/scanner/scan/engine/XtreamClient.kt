@@ -71,13 +71,6 @@ private data class InfoServidor(val timezone: String? = null)
 private data class Categoria(val category_name: String? = null)
 
 @Serializable
-private data class CanalLive(val name: String? = null)
-
-/** `get_vod_streams`/`get_series` traen más campos, pero acá solo hace falta el nombre. */
-@Serializable
-private data class StreamConNombre(val name: String? = null)
-
-@Serializable
 private data class RespuestaGeoIp(
     val city: String? = null,
     val country_name: String? = null,
@@ -269,30 +262,6 @@ object XtreamClient {
 
     /** Cantidad de series del panel — equivalente a `series` en Python. */
     suspend fun obtenerCantidadSeries(cred: CredencialesXtream): Int? = contarStream(cred, "get_series")
-
-    private suspend fun obtenerNombresStream(cred: CredencialesXtream, accion: String): List<String> {
-        return runCatching {
-            val elementos: List<StreamConNombre> = NetworkModule.cliente.get(urlPlayerApi(cred)) {
-                parameter("username", cred.username)
-                parameter("password", cred.password)
-                parameter("action", accion)
-            }.body()
-            elementos.mapNotNull { it.name }
-        }.getOrDefault(emptyList())
-    }
-
-    /**
-     * Nombres completos de películas/series del panel — a diferencia de
-     * [obtenerCantidadPeliculas]/[obtenerCantidadSeries] (que solo cuentan),
-     * estas sí traen la lista completa. Pedido explícito del usuario: poder
-     * ver el detalle de una lista (qué tiene) sin ir a Telegram. Se llaman
-     * solo cuando el usuario abre el detalle de ESA lista puntual — pedirlas
-     * para las cientos de listas de un escaneo masivo sería mucho más
-     * tráfico del necesario para algo que la mayoría de las veces no se va
-     * a mirar.
-     */
-    suspend fun obtenerNombresPeliculas(cred: CredencialesXtream): List<String> = obtenerNombresStream(cred, "get_vod_streams")
-    suspend fun obtenerNombresSeries(cred: CredencialesXtream): List<String> = obtenerNombresStream(cred, "get_series")
 
     // Con muchos enlaces validándose a la vez (hasta MAX_VALIDACIONES_EN_PARALELO
     // en ValidadorListas), cada uno ya dispara varias peticiones de red en

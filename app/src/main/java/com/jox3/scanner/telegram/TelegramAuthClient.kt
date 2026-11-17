@@ -12,8 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
  * de TDLib (CMake + NDK, generación de TdApi.java desde td_api.tl) depende de
  * la versión exacta del submódulo tdlib y de cómo quieras compilarla (fuente
  * vs. binario precompilado), así que se resuelve en un PR aparte en vez de
- * adivinar una configuración que podría no compilarte. Mientras tanto,
- * FakeTelegramAuthClient permite probar toda la UI de login.
+ * adivinar una configuración que podría no compilarte.
  */
 interface TelegramAuthClient {
     val estado: StateFlow<TelegramAuthState>
