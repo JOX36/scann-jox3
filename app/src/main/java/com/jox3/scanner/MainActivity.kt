@@ -159,6 +159,32 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
         }
         else -> if (estadoVerificador.verificando) "Verificando lista…" else null
     }
+    // Aviso al terminar si la app no está a la vista (el usuario salió mientras escaneaba).
+    val ciclo = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    var estabaEscaneando by remember { mutableStateOf(false) }
+    var estabaVerificando by remember { mutableStateOf(false) }
+    LaunchedEffect(estadoEscaneo, estadoVerificador.verificando) {
+        val fueraDePantalla = !ciclo.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+        val e = estadoEscaneo
+        if (estabaEscaneando && e is EstadoFlujoEscaneo.Resultados && fueraDePantalla) {
+            val activas = e.listas.count { it.activa }
+            com.jox3.scanner.scan.ServicioEscaneo.notificarTerminado(
+                contextoServicio,
+                "Escaneo terminado",
+                "$activas lista(s) activa(s) encontrada(s). Toca para ver los resultados.",
+            )
+        }
+        estabaEscaneando = e is EstadoFlujoEscaneo.Escaneando
+        if (estabaVerificando && !estadoVerificador.verificando && fueraDePantalla) {
+            val lista = estadoVerificador.lista
+            com.jox3.scanner.scan.ServicioEscaneo.notificarTerminado(
+                contextoServicio,
+                "Verificación terminada",
+                if (lista != null) "${lista.credenciales.host}: activa" else "La lista no está activa o no respondió.",
+            )
+        }
+        estabaVerificando = estadoVerificador.verificando
+    }
     LaunchedEffect(textoEscaneo != null) {
         if (textoEscaneo != null && android.os.Build.VERSION.SDK_INT >= 33) {
             permisoNotificaciones.launch(android.Manifest.permission.POST_NOTIFICATIONS)

@@ -87,6 +87,33 @@ class ServicioEscaneo : Service() {
         private const val EXTRA_TEXTO = "texto"
         private const val MAX_DURACION_MS = 6 * 60 * 60 * 1000L
 
+        private const val CANAL_AVISOS = "avisos"
+        private const val ID_AVISO = 4202
+
+        /**
+         * Aviso de "escaneo terminado" (sonido normal, se puede tocar para abrir la app);
+         * solo tiene sentido mostrarlo cuando la app NO está en pantalla.
+         */
+        fun notificarTerminado(contexto: Context, titulo: String, texto: String) {
+            val nm = contexto.getSystemService(NotificationManager::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                nm.createNotificationChannel(NotificationChannel(CANAL_AVISOS, "Avisos de resultados", NotificationManager.IMPORTANCE_DEFAULT))
+            }
+            val abrir = contexto.packageManager.getLaunchIntentForPackage(contexto.packageName)?.let {
+                android.app.PendingIntent.getActivity(
+                    contexto, 1, it, android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+                )
+            }
+            val n = NotificationCompat.Builder(contexto, CANAL_AVISOS)
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setContentTitle(titulo)
+                .setContentText(texto)
+                .setAutoCancel(true)
+                .setContentIntent(abrir)
+                .build()
+            runCatching { nm.notify(ID_AVISO, n) } // sin permiso de notificaciones simplemente no se muestra
+        }
+
         /** Inicia el servicio, o solo actualiza el texto de la notificación si ya está activo. */
         fun iniciarOActualizar(contexto: Context, texto: String) {
             val intent = Intent(contexto, ServicioEscaneo::class.java).putExtra(EXTRA_TEXTO, texto)

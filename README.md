@@ -645,6 +645,7 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 ## Etapa 24
 
 - **Escaneo en segundo plano**: al salir de la app, Android bajaba su prioridad (congela la red/corrutinas o mata el proceso) y la lectura de mensajes o la validación de listas se cortaba. Ahora, mientras hay un escaneo (o una verificación) en curso, un **servicio en primer plano** (`ServicioEscaneo`, tipo `dataSync`) mantiene viva la app, con una notificación que muestra el avance (`listas · mensajes · chat que se lee`) y un wake lock parcial para que la CPU no se duerma con la pantalla apagada. Se detiene solo al terminar. En Android 13+ pide el permiso de notificaciones (el servicio funciona aunque se rechace).
+- **Aviso al terminar** (Etapa 24b): si saliste de la app, al acabar el escaneo o la verificación llega una notificación ("Escaneo terminado: N lista(s) activa(s)…") que abre la app al tocarla; si la app está a la vista no se muestra.
 - Limitación: si el sistema o el usuario cierra la app a la fuerza, el escaneo se pierde; algunos fabricantes (Xiaomi, Oppo, Huawei…) además requieren quitar la optimización de batería a la app (Ajustes → Batería).
 
 ## Nota sobre el CI
