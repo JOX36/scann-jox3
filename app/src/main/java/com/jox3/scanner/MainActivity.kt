@@ -146,6 +146,33 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
     val verificadorViewModel: VerificadorViewModel = viewModel()
     val estadoVerificador by verificadorViewModel.estado.collectAsState()
 
+    // Escaneo en segundo plano: mientras se escanea (o se verifica una lista) un
+    // servicio en primer plano mantiene viva la app aunque se salga de ella.
+    val contextoServicio = LocalContext.current
+    val permisoNotificaciones = rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { /* con o sin permiso el servicio funciona; solo cambia si se ve la notificación */ }
+    val textoEscaneo: String? = when (val e = estadoEscaneo) {
+        is EstadoFlujoEscaneo.Escaneando -> buildString {
+            append("${e.procesados}/${e.total} listas · ${e.mensajesChatsTerminados + e.mensajesChatActual} mensajes")
+            e.chatLeyendo?.let { append(" · leyendo $it") }
+        }
+        else -> if (estadoVerificador.verificando) "Verificando lista…" else null
+    }
+    LaunchedEffect(textoEscaneo != null) {
+        if (textoEscaneo != null && android.os.Build.VERSION.SDK_INT >= 33) {
+            permisoNotificaciones.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+    LaunchedEffect(textoEscaneo) {
+        if (textoEscaneo == null) {
+            com.jox3.scanner.scan.ServicioEscaneo.detener(contextoServicio)
+        } else {
+            kotlinx.coroutines.delay(800) // agrupa cambios rápidos para no saturar las notificaciones
+            com.jox3.scanner.scan.ServicioEscaneo.iniciarOActualizar(contextoServicio, textoEscaneo)
+        }
+    }
+
     // Launcher para volver de la pantalla de "Instalar apps desconocidas"
     // y reintentar la descarga si el usuario concedió el permiso.
     var infoPendientePermiso by remember { mutableStateOf<InfoActualizacion?>(null) }

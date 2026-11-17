@@ -12,6 +12,12 @@
     -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Escaneo en segundo plano: servicio en primer plano de tipo "sincronización de datos". -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="false"
         android:label="IPTV Scanner"
@@ -27,6 +33,11 @@
             panel sí funcionara — el motivo real de que un escaneo marcara
             el 100% de las listas encontradas como inactivas.
         -->
+
+        <service
+            android:name=".scan.ServicioEscaneo"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <activity
             android:name=".MainActivity"

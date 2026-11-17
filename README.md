@@ -642,6 +642,11 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - **Nombre del archivo como en el script de Python**: `Resultados_Latinos_<chat>.txt` (p. ej. `Resultados_Latinos_G-PANDORA`), `Resultados_<host>.txt` en búsquedas por host y `Resultados_Latinos_<archivo>.txt` para un .txt local; al enviarlo a Telegram lleva ese nombre como texto de pie ("Resultados Latinos G-PANDORA").
 - **Una sola lista (Verificar / detalle)**: "Enviar a Telegram" manda el resultado **suelto como mensaje(s) de texto**, no como .txt. Telegram admite 4096 caracteres por mensaje; el informe llega en mensajes por bloques, sin numerar: datos de la cuenta, 📡 TV en vivo, 🎬 Series y 🎥 Películas (con el pie junto al último). Si un bloque solo supera los 4096 caracteres de Telegram, se parte en la última coma (4000 c/u). 0,4 s entre envíos.
 
+## Etapa 24
+
+- **Escaneo en segundo plano**: al salir de la app, Android bajaba su prioridad (congela la red/corrutinas o mata el proceso) y la lectura de mensajes o la validación de listas se cortaba. Ahora, mientras hay un escaneo (o una verificación) en curso, un **servicio en primer plano** (`ServicioEscaneo`, tipo `dataSync`) mantiene viva la app, con una notificación que muestra el avance (`listas · mensajes · chat que se lee`) y un wake lock parcial para que la CPU no se duerma con la pantalla apagada. Se detiene solo al terminar. En Android 13+ pide el permiso de notificaciones (el servicio funciona aunque se rechace).
+- Limitación: si el sistema o el usuario cierra la app a la fuerza, el escaneo se pierde; algunos fabricantes (Xiaomi, Oppo, Huawei…) además requieren quitar la optimización de batería a la app (Ajustes → Batería).
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
