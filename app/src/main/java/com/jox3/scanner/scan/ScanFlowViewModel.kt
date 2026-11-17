@@ -115,6 +115,10 @@ sealed class EstadoFlujoEscaneo {
 class ScanFlowViewModel(
     private val chatsRepository: ChatsRepository = FakeChatsRepository(),
     private val escanerRepository: EscanerRepository = FakeEscanerRepository(),
+    /** Carpeta donde se guarda la copia del escaneo (ver [AlmacenRespaldo]); `null` = sin respaldo. */
+    private val carpetaRespaldo: java.io.File? = null,
+    /** Motivo del último cierre de la app (ver [DiagnosticoCierre]), para mostrarlo al recuperar. */
+    motivoUltimoCierre: String? = null,
 ) : ViewModel() {
 
     private val _estado = MutableStateFlow<EstadoFlujoEscaneo>(EstadoFlujoEscaneo.CargandoChats)
@@ -145,6 +149,14 @@ class ScanFlowViewModel(
     val detalleCargando: StateFlow<Boolean> = _detalleCargando.asStateFlow()
     private var detalleJob: Job? = null
 
+    private fun respaldar(
+        encontradas: List<ListaValidada>, errores: List<String>, diagnostico: List<String>, enCurso: Boolean,
+    ) {
+        val carpeta = carpetaRespaldo ?: return
+        val copia = RespaldoEscaneo(encontradas.toList(), errores.toList(), diagnostico.toList(), nombreArchivoActual, enCurso)
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) { AlmacenRespaldo.guardar(carpeta, copia) }
+    }
+
     private var nombreArchivoActual = "Resultados_IPTV"
 
     // Último resultado de escaneo: la pestaña "Resultados" lo muestra aunque
@@ -152,6 +164,26 @@ class ScanFlowViewModel(
     // mismo estado y los botones inferiores no llevaban a donde se tocaba).
     private val _ultimoResultado = MutableStateFlow<EstadoFlujoEscaneo.Resultados?>(null)
     val ultimoResultado: StateFlow<EstadoFlujoEscaneo.Resultados?> = _ultimoResultado.asStateFlow()
+
+    init {
+        // Si la app se cerró en pleno escaneo, se recuperan las listas que ya estaban validadas.
+        carpetaRespaldo?.let { carpeta ->
+            AlmacenRespaldo.cargar(carpeta)?.takeIf { it.listas.isNotEmpty() }?.let { r ->
+                val aviso = if (r.enCurso) {
+                    listOf(
+                        "⚠️ El escaneo anterior se interrumpió. Se recuperaron ${r.listas.size} lista(s) ya validada(s)" +
+                            (motivoUltimoCierre?.let { " · motivo del cierre: $it" } ?: "") + ".",
+                    )
+                } else emptyList()
+                val erroresConAviso = aviso + r.errores
+                // El aviso queda guardado y la copia deja de figurar "en curso": no se repite en cada apertura.
+                if (r.enCurso) AlmacenRespaldo.guardar(carpeta, r.copy(errores = erroresConAviso, enCurso = false))
+                _ultimoResultado.value = EstadoFlujoEscaneo.Resultados(
+                    r.listas, erroresConAviso, r.diagnostico, emptyList(), r.nombreArchivo,
+                )
+            }
+        }
+    }
 
     /** Botón "Buscar" de la barra inferior: cierra cualquier detalle y vuelve al menú de modos (salvo mientras se escanea). */
     fun irABuscar() {
@@ -380,6 +412,7 @@ class ScanFlowViewModel(
         scanJob?.cancel()
         scanJob = null
         val parcial = EstadoFlujoEscaneo.Resultados(encontradasActuales, erroresActuales, diagnosticoActual, registroActual, nombreArchivoActual)
+        respaldar(encontradasActuales, erroresActuales, diagnosticoActual, enCurso = false)
         _ultimoResultado.value = parcial
         _estado.value = parcial
     }
@@ -406,6 +439,7 @@ class ScanFlowViewModel(
             is EventoEscaneo.ListaEncontrada -> {
                 encontradas += evento.lista
                 encontradasActuales = encontradas.toList()
+                respaldar(encontradas, errores, diagnostico, enCurso = true)
                 val estadoActual = _estado.value
                 if (estadoActual is EstadoFlujoEscaneo.Escaneando) {
                     _estado.value = estadoActual.copy(encontradas = encontradas.toList())
@@ -461,6 +495,7 @@ class ScanFlowViewModel(
                     registro.toList(),
                     nombreArchivoActual,
                 )
+                respaldar(encontradas, errores, diagnostico, enCurso = false)
                 _ultimoResultado.value = resultadoFinal
                 _estado.value = resultadoFinal
             }
@@ -502,9 +537,11 @@ class ScanFlowViewModel(
 class ScanFlowViewModelFactory(
     private val chatsRepository: ChatsRepository,
     private val escanerRepository: EscanerRepository,
+    private val carpetaRespaldo: java.io.File? = null,
+    private val motivoUltimoCierre: String? = null,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return ScanFlowViewModel(chatsRepository, escanerRepository) as T
+        return ScanFlowViewModel(chatsRepository, escanerRepository, carpetaRespaldo, motivoUltimoCierre) as T
     }
 }

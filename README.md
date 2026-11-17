@@ -649,6 +649,11 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - Etapa 24c: endurecido el servicio — el texto de la notificación se actualiza con `notify` (sin relanzar `startForegroundService` desde segundo plano, que en Android 12+ puede lanzar `ForegroundServiceStartNotAllowedException`) y todo va dentro de `runCatching`: un fallo del aviso no puede tumbar el escaneo.
 - Limitación: si el sistema o el usuario cierra la app a la fuerza, el escaneo se pierde; algunos fabricantes (Xiaomi, Oppo, Huawei…) además requieren quitar la optimización de batería a la app (Ajustes → Batería).
 
+## Etapa 25
+
+- **Recuperación tras un cierre inesperado**: el escaneo se guarda en disco (`respaldo_escaneo.json`) cada vez que se valida una lista. Si la app se cierra y se reinicia, las listas ya validadas reaparecen en la pestaña **Resultados** con un aviso ("El escaneo anterior se interrumpió. Se recuperaron N lista(s)…"). No se guarda el avance de lectura de mensajes: hay que volver a escanear lo que faltaba.
+- **Diagnóstico del cierre**: se guarda la traza de cualquier error no controlado (`ultimo_error.txt`) y se consulta el motivo que registró Android (`ApplicationExitInfo`: falta de memoria, error nativo, ahorro de batería, etc.). El motivo sale en ese mismo aviso, para saber por qué se cerró.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

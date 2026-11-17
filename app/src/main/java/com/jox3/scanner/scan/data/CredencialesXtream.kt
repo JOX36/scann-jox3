@@ -19,6 +19,7 @@ import java.net.URLDecoder
  * URL perfecta: solo necesita encontrar "username=" y "password=" en algún
  * lugar de la query.
  */
+@kotlinx.serialization.Serializable
 data class CredencialesXtream(
     val host: String,
     val username: String,

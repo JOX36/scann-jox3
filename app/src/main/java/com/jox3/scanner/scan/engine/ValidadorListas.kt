@@ -2,6 +2,7 @@ package com.jox3.scanner.scan.engine
 
 import com.jox3.scanner.scan.data.CredencialesXtream
 import kotlinx.coroutines.async
+import kotlinx.serialization.Serializable
 import kotlinx.coroutines.coroutineScope
 
 /**
@@ -11,6 +12,7 @@ import kotlinx.coroutines.coroutineScope
  * panel no dio ese dato (no cuando la lista está inactiva: una lista
  * inactiva simplemente no tiene ninguno de estos datos).
  */
+@Serializable
 data class ListaValidada(
     val credenciales: CredencialesXtream,
     val activa: Boolean,

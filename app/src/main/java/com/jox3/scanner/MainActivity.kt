@@ -85,6 +85,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Guarda la traza si la app se cierra por un error, para poder mostrar el motivo al reabrir.
+        com.jox3.scanner.scan.DiagnosticoCierre.instalar(filesDir)
         setContent {
             ScannJox3Theme {
                 FondoConGlow(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -140,7 +142,11 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
     val chatsRepository = remember { TdChatsRepository(authClient) }
     val escanerRepository = remember { TdEscanerRepository(authClient) }
     val scanViewModel: ScanFlowViewModel = viewModel(
-        factory = ScanFlowViewModelFactory(chatsRepository, escanerRepository),
+        factory = run {
+            val contextoApp = LocalContext.current
+            val motivo = remember { com.jox3.scanner.scan.DiagnosticoCierre.motivoUltimoCierre(contextoApp, contextoApp.filesDir) }
+            ScanFlowViewModelFactory(chatsRepository, escanerRepository, contextoApp.filesDir, motivo)
+        },
     )
     val estadoEscaneo by scanViewModel.estado.collectAsState()
     val verificadorViewModel: VerificadorViewModel = viewModel()
