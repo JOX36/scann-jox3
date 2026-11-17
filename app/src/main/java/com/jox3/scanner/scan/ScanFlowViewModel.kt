@@ -129,6 +129,8 @@ sealed class EstadoFlujoEscaneo {
         val nombreArchivo: String = "Resultados_IPTV",
         /** `null` si el resultado viene de una recuperación (no hay contadores de caídas). */
         val resumen: ResumenEscaneo? = null,
+        /** TODAS las listas validadas (activas y caídas, LATAM o no): permite elegir qué ver tocando cada contador. No se exporta. */
+        val todas: List<ListaValidada> = emptyList(),
     ) : EstadoFlujoEscaneo()
 }
 
@@ -158,6 +160,7 @@ class ScanFlowViewModel(
     private var diagnosticoActual: List<String> = emptyList()
     private var registroActual: List<String> = emptyList()
     private var resumenActual = ResumenEscaneo()
+    private val validadasActuales = mutableListOf<ListaValidada>()
 
     // Detalle de una lista puntual (pedido explícito del usuario: poder
     // tocar un resultado y consultar su info extra sin ir a Telegram).
@@ -425,6 +428,7 @@ class ScanFlowViewModel(
         diagnosticoActual = emptyList()
         registroActual = emptyList()
         resumenActual = ResumenEscaneo()
+        validadasActuales.clear()
         _estado.value = EstadoFlujoEscaneo.Escaneando(0, 0, emptyList())
         scanJob = viewModelScope.launch {
             val encontradas = mutableListOf<ListaValidada>()
@@ -450,6 +454,7 @@ class ScanFlowViewModel(
         diagnosticoActual = emptyList()
         registroActual = emptyList()
         resumenActual = ResumenEscaneo()
+        validadasActuales.clear()
         _estado.value = EstadoFlujoEscaneo.Escaneando(0, 0, emptyList())
         scanJob = viewModelScope.launch {
             val encontradas = mutableListOf<ListaValidada>()
@@ -486,7 +491,7 @@ class ScanFlowViewModel(
             mensajes = e?.let { it.mensajesChatsTerminados + it.mensajesChatActual } ?: 0,
             duracionSeg = e?.let { (System.currentTimeMillis() - it.inicioMs) / 1000 } ?: 0,
         )
-        return EstadoFlujoEscaneo.Resultados(listas, errores, diagnostico, registro, nombreArchivoActual, resumen)
+        return EstadoFlujoEscaneo.Resultados(listas, errores, diagnostico, registro, nombreArchivoActual, resumen, validadasActuales.toList())
     }
 
     private fun procesarEvento(
@@ -518,11 +523,13 @@ class ScanFlowViewModel(
                 }
             }
             is EventoEscaneo.Validada -> {
+                val v = evento.lista
+                validadasActuales += v
                 resumenActual = resumenActual.copy(
-                    activas = resumenActual.activas + if (evento.activa) 1 else 0,
-                    caidas = resumenActual.caidas + if (evento.activa) 0 else 1,
-                    latinas = resumenActual.latinas + if (evento.activa && evento.esLatino) 1 else 0,
-                    espana = resumenActual.espana + if (evento.activa && evento.esEspana) 1 else 0,
+                    activas = resumenActual.activas + if (v.activa) 1 else 0,
+                    caidas = resumenActual.caidas + if (v.activa) 0 else 1,
+                    latinas = resumenActual.latinas + if (v.activa && v.esLatino) 1 else 0,
+                    espana = resumenActual.espana + if (v.activa && v.esEspana) 1 else 0,
                 )
                 (_estado.value as? EstadoFlujoEscaneo.Escaneando)?.let { _estado.value = it.copy(resumen = resumenActual) }
             }

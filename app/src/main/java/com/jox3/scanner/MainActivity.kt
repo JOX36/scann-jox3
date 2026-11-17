@@ -339,6 +339,7 @@ private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlo
                     onListaElegida = viewModel::abrirDetalle,
                     nombreArchivo = estado.nombreArchivo,
                     resumen = estado.resumen,
+                    todas = estado.todas,
                 )
             }
         }
@@ -502,6 +503,7 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                     onListaElegida = viewModel::abrirDetalle,
                     nombreArchivo = s.nombreArchivo,
                     resumen = s.resumen,
+                    todas = s.todas,
                 )
             }
         }
@@ -526,6 +528,7 @@ private fun ResultsScreenConectada(
     onListaElegida: (ListaValidada) -> Unit = {},
     nombreArchivo: String = "Resultados_IPTV",
     resumen: com.jox3.scanner.scan.ResumenEscaneo? = null,
+    todas: List<ListaValidada> = emptyList(),
 ) {
     val contexto = LocalContext.current
     val credencialesBot = remember { CredencialesBotTelegram(contexto) }
@@ -533,6 +536,7 @@ private fun ResultsScreenConectada(
 
     ResultsScreen(
         resumen = resumen,
+        todas = todas,
         listas = listas,
         errores = errores,
         diagnostico = diagnostico,

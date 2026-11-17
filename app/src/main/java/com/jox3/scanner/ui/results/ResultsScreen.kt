@@ -42,17 +42,27 @@ import com.jox3.scanner.ui.theme.TextoSecundario
 /** Días restantes por debajo de los cuales una lista activa se considera "por vencer" (igual que Python). */
 private const val UMBRAL_POR_VENCER = 15
 
+/** Qué lista se muestra: cada contador del resumen es un botón que elige uno de estos filtros. */
 private enum class FiltroResultados(val etiqueta: String) {
-    TODAS("Todas"),
+    ESCANEADAS("Escaneadas"),
+    ON("Activas (ON)"),
+    OFF("Caídas (OFF)"),
+    LATAM("Latinas"),
+    NO_LATAM("No latinas"),
+    ESPANA("España"),
     POR_VENCER("Por vencer"),
-    LATAM("LATAM"),
 }
 
-/** Pantalla "Resultados": el resumen final, igual que `print_scan_summary` del script de Python. */
+/**
+ * Pantalla "Resultados": resumen final (cada contador es un botón) y, justo debajo, la cascada de
+ * listas del filtro elegido; al tocar una se abre su información completa. Todo en una sola
+ * lista desplazable, así los paneles de diagnóstico ya no empujan las listas fuera de la pantalla.
+ */
 @Composable
 fun ResultsScreen(
     listas: List<ListaValidada>,
     resumen: com.jox3.scanner.scan.ResumenEscaneo? = null,
+    todas: List<ListaValidada> = emptyList(),
     onEscanearDeNuevo: () -> Unit,
     errores: List<String> = emptyList(),
     diagnostico: List<String> = emptyList(),
@@ -62,97 +72,109 @@ fun ResultsScreen(
     onCompartirRegistro: (() -> Unit)? = null,
     onListaElegida: (ListaValidada) -> Unit = {},
 ) {
-    val activas = listas.filter { it.activa }
+    // Sin "todas" (resultado recuperado tras un cierre) se trabaja solo con las guardadas.
+    val universo = if (todas.isNotEmpty()) todas else listas
+    val activas = universo.filter { it.activa }
+    val caidas = universo.filter { !it.activa }
     val latam = activas.filter { it.esLatino }
     val porVencer = activas.filter { it.diasRestantes != null && it.diasRestantes < UMBRAL_POR_VENCER }
 
-    var filtro by remember { mutableStateOf(FiltroResultados.TODAS) }
+    var filtro by remember { mutableStateOf(if (latam.isNotEmpty()) FiltroResultados.LATAM else FiltroResultados.ON) }
     val listaMostrada = when (filtro) {
-        FiltroResultados.TODAS -> activas
-        FiltroResultados.POR_VENCER -> porVencer
+        FiltroResultados.ESCANEADAS -> universo
+        FiltroResultados.ON -> activas
+        FiltroResultados.OFF -> caidas
         FiltroResultados.LATAM -> latam
+        FiltroResultados.NO_LATAM -> activas.filter { !it.esLatino }
+        FiltroResultados.ESPANA -> activas.filter { it.esEspana }
+        FiltroResultados.POR_VENCER -> porVencer
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-        Text("Resultados", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
-        Spacer(Modifier.height(12.dp))
-
-        if (resumen != null) {
-            ResumenFinal(resumen, porVencer = porVencer.size)
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                EstadisticaChip("Activas", activas.size.toString(), AcentoApp, Modifier.weight(1f))
-                EstadisticaChip("Validadas", listas.size.toString(), TextoPrimario, Modifier.weight(1f))
-                EstadisticaChip("LATAM", latam.size.toString(), com.jox3.scanner.ui.theme.AcentoSecundario, Modifier.weight(1f))
-            }
-        }
-
-        if (errores.isNotEmpty()) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp)) {
+        item {
+            Text("Resultados", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
             Spacer(Modifier.height(12.dp))
-            PanelErrores(errores)
-        }
-
-        if (diagnostico.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            PanelDiagnostico(diagnostico)
-        }
-
-        if (registro.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            PanelRegistro(registro)
-        }
-
-        if (onCompartirRegistro != null && (errores.isNotEmpty() || diagnostico.isNotEmpty() || registro.isNotEmpty())) {
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onCompartirRegistro, modifier = Modifier.fillMaxWidth()) {
-                Text("Descargar/compartir registro (.txt)")
+            if (resumen != null) {
+                ResumenFinal(
+                    resumen,
+                    porVencer = porVencer.size,
+                    filtro = filtro,
+                    onFiltro = { filtro = it },
+                )
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    EstadisticaChip("Activas", activas.size.toString(), AcentoApp, Modifier.weight(1f), seleccionado = filtro == FiltroResultados.ON, onClick = { filtro = FiltroResultados.ON })
+                    EstadisticaChip("Validadas", universo.size.toString(), TextoPrimario, Modifier.weight(1f), seleccionado = filtro == FiltroResultados.ESCANEADAS, onClick = { filtro = FiltroResultados.ESCANEADAS })
+                    EstadisticaChip("LATAM", latam.size.toString(), com.jox3.scanner.ui.theme.AcentoSecundario, Modifier.weight(1f), seleccionado = filtro == FiltroResultados.LATAM, onClick = { filtro = FiltroResultados.LATAM })
+                }
             }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "${filtro.etiqueta} · ${listaMostrada.size}",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextoPrimario,
+            )
+            Spacer(Modifier.height(4.dp))
         }
-
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FiltroResultados.entries.forEach { opcion ->
-                FiltroChip(opcion.etiqueta, seleccionado = filtro == opcion, onClick = { filtro = opcion })
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
 
         if (listaMostrada.isEmpty()) {
-            Text(
-                when {
-                    listas.isEmpty() && errores.isNotEmpty() ->
-                        "No se encontraron enlaces. Revisa los chats con error arriba: puede ser la causa real."
-                    listas.isEmpty() -> "No se encontraron enlaces con este modo de búsqueda."
-                    else -> "Ninguna lista coincide con este filtro."
-                },
-                color = TextoSecundario,
-                fontSize = 13.sp,
-            )
+            item {
+                Text(
+                    when {
+                        universo.isEmpty() && errores.isNotEmpty() ->
+                            "No se encontraron enlaces. Revisa los chats con error abajo: puede ser la causa real."
+                        universo.isEmpty() -> "No se encontraron enlaces con este modo de búsqueda."
+                        else -> "Ninguna lista en esta categoría."
+                    },
+                    color = TextoSecundario,
+                    fontSize = 13.sp,
+                )
+            }
         } else {
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(listaMostrada) { lista -> FilaResultado(lista, onClick = { onListaElegida(lista) }) }
+            items(listaMostrada) { lista ->
+                FilaResultado(lista, onClick = if (lista.activa) ({ onListaElegida(lista) }) else null)
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-        if (onGuardarTxt != null || onEnviarTelegram != null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                if (onGuardarTxt != null) {
-                    OutlinedButton(onClick = onGuardarTxt, modifier = Modifier.weight(1f)) {
-                        Text("Guardar .txt")
+        item {
+            Spacer(Modifier.height(16.dp))
+            if (onGuardarTxt != null || onEnviarTelegram != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    if (onGuardarTxt != null) {
+                        OutlinedButton(onClick = onGuardarTxt, modifier = Modifier.weight(1f)) { Text("Guardar .txt") }
+                    }
+                    if (onEnviarTelegram != null) {
+                        Button(onClick = onEnviarTelegram, modifier = Modifier.weight(1f)) { Text("Enviar a Telegram") }
                     }
                 }
-                if (onEnviarTelegram != null) {
-                    Button(onClick = onEnviarTelegram, modifier = Modifier.weight(1f)) {
-                        Text("Enviar a Telegram")
+                Spacer(Modifier.height(8.dp))
+            }
+            Button(onClick = onEscanearDeNuevo, modifier = Modifier.fillMaxWidth()) { Text("Escanear de nuevo") }
+        }
+
+        // Diagnóstico al final: sirve para depurar, pero no debe tapar las listas.
+        if (errores.isNotEmpty() || diagnostico.isNotEmpty() || registro.isNotEmpty()) {
+            item {
+                Spacer(Modifier.height(20.dp))
+                if (errores.isNotEmpty()) {
+                    PanelErrores(errores)
+                    Spacer(Modifier.height(12.dp))
+                }
+                if (diagnostico.isNotEmpty()) {
+                    PanelDiagnostico(diagnostico)
+                    Spacer(Modifier.height(12.dp))
+                }
+                if (registro.isNotEmpty()) {
+                    PanelRegistro(registro)
+                    Spacer(Modifier.height(8.dp))
+                }
+                if (onCompartirRegistro != null) {
+                    OutlinedButton(onClick = onCompartirRegistro, modifier = Modifier.fillMaxWidth()) {
+                        Text("Descargar/compartir registro (.txt)")
                     }
                 }
             }
-            Spacer(Modifier.height(8.dp))
-        }
-        Button(onClick = onEscanearDeNuevo, modifier = Modifier.fillMaxWidth()) {
-            Text("Escanear de nuevo")
         }
     }
 }
@@ -163,7 +185,12 @@ fun ResultsScreen(
  * violeta = España, amarillo = por vencer.
  */
 @Composable
-private fun ResumenFinal(r: com.jox3.scanner.scan.ResumenEscaneo, porVencer: Int) {
+private fun ResumenFinal(
+    r: com.jox3.scanner.scan.ResumenEscaneo,
+    porVencer: Int,
+    filtro: FiltroResultados,
+    onFiltro: (FiltroResultados) -> Unit,
+) {
     val tasa = if (r.escaneadas > 0) r.activas * 100 / r.escaneadas else 0
     Surface(
         color = SuperficieApp,
@@ -185,21 +212,24 @@ private fun ResumenFinal(r: com.jox3.scanner.scan.ResumenEscaneo, porVencer: Int
             )
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                EstadisticaChip("Escaneadas", r.escaneadas.toString(), TextoPrimario, Modifier.weight(1f))
-                EstadisticaChip("ON", r.activas.toString(), AcentoApp, Modifier.weight(1f))
-                EstadisticaChip("OFF", r.caidas.toString(), ErrorApp, Modifier.weight(1f))
+                EstadisticaChip("Escaneadas", r.escaneadas.toString(), TextoPrimario, Modifier.weight(1f), filtro == FiltroResultados.ESCANEADAS) { onFiltro(FiltroResultados.ESCANEADAS) }
+                EstadisticaChip("ON", r.activas.toString(), AcentoApp, Modifier.weight(1f), filtro == FiltroResultados.ON) { onFiltro(FiltroResultados.ON) }
+                EstadisticaChip("OFF", r.caidas.toString(), ErrorApp, Modifier.weight(1f), filtro == FiltroResultados.OFF) { onFiltro(FiltroResultados.OFF) }
             }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                EstadisticaChip("Latinas", r.latinas.toString(), com.jox3.scanner.ui.theme.AcentoSecundario, Modifier.weight(1f))
-                EstadisticaChip("No latinas", r.noLatinas.toString(), TextoPrimario, Modifier.weight(1f))
-                EstadisticaChip("España", r.espana.toString(), com.jox3.scanner.ui.theme.VioletaApp, Modifier.weight(1f))
+                EstadisticaChip("Latinas", r.latinas.toString(), com.jox3.scanner.ui.theme.AcentoSecundario, Modifier.weight(1f), filtro == FiltroResultados.LATAM) { onFiltro(FiltroResultados.LATAM) }
+                EstadisticaChip("No latinas", r.noLatinas.toString(), TextoPrimario, Modifier.weight(1f), filtro == FiltroResultados.NO_LATAM) { onFiltro(FiltroResultados.NO_LATAM) }
+                EstadisticaChip("España", r.espana.toString(), com.jox3.scanner.ui.theme.VioletaApp, Modifier.weight(1f), filtro == FiltroResultados.ESPANA) { onFiltro(FiltroResultados.ESPANA) }
             }
             Spacer(Modifier.height(10.dp))
             val min = r.duracionSeg / 60
             val seg = r.duracionSeg % 60
+            if (porVencer > 0) {
+                FiltroChip("⏳ $porVencer por vencer", seleccionado = filtro == FiltroResultados.POR_VENCER) { onFiltro(FiltroResultados.POR_VENCER) }
+                Spacer(Modifier.height(8.dp))
+            }
             val partes = buildList {
-                if (porVencer > 0) add("⏳ $porVencer por vencer")
                 if (r.mensajes > 0) add("📨 ${r.mensajes} mensajes")
                 if (r.duracionSeg > 0) add("⏱ %d:%02d".format(min, seg))
             }
@@ -211,8 +241,21 @@ private fun ResumenFinal(r: com.jox3.scanner.scan.ResumenEscaneo, porVencer: Int
 }
 
 @Composable
-private fun EstadisticaChip(etiqueta: String, valor: String, colorValor: Color, modifier: Modifier = Modifier) {
-    Surface(color = SuperficieApp, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, com.jox3.scanner.ui.theme.BordeHud), modifier = modifier) {
+private fun EstadisticaChip(
+    etiqueta: String,
+    valor: String,
+    colorValor: Color,
+    modifier: Modifier = Modifier,
+    seleccionado: Boolean = false,
+    onClick: () -> Unit = {},
+) {
+    Surface(
+        color = if (seleccionado) colorValor.copy(alpha = 0.16f) else SuperficieApp,
+        shape = RoundedCornerShape(16.dp),
+        border = if (seleccionado) BorderStroke(1.5.dp, colorValor) else BorderStroke(1.dp, com.jox3.scanner.ui.theme.BordeHud),
+        onClick = onClick,
+        modifier = modifier,
+    ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             Text(valor, color = colorValor, fontSize = 24.sp, fontWeight = FontWeight.Bold, fontFamily = com.jox3.scanner.ui.common.FuenteHud)
             Text(etiqueta.uppercase(), color = TextoSecundario, fontSize = 10.sp, letterSpacing = 1.sp)
@@ -268,7 +311,13 @@ internal fun FilaResultado(lista: ListaValidada, onClick: (() -> Unit)? = null) 
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(lista.credenciales.host, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
-                InsigniaVencimiento(lista.diasRestantes)
+                if (lista.activa) {
+                    InsigniaVencimiento(lista.diasRestantes)
+                } else {
+                    Surface(color = ErrorApp.copy(alpha = 0.18f), shape = RoundedCornerShape(50)) {
+                        Text("OFF", color = ErrorApp, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
+                    }
+                }
             }
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

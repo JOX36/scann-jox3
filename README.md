@@ -694,6 +694,12 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - **Barra inferior nueva**: cápsula de cristal con borde brillante, iconos vectoriales y píldora con degradado y resplandor en la pestaña activa (adiós a los emojis de colores sobre gris plano).
 - **Rotación**: la Activity ya no se recrea al girar la pantalla (`configChanges`), así que no se reinicia nada. La animación de bienvenida solo aparece en el arranque en frío del proceso, no al girar ni al reabrir la app con el proceso vivo.
 
+## Etapa 31 — Cada contador es un botón: elige qué listas ver
+
+- Resultados ahora es una sola lista desplazable: arriba el resumen, **justo debajo la cascada de listas** del contador elegido, y al final los botones y el diagnóstico (antes los paneles de diagnóstico empujaban las listas fuera de la pantalla).
+- Tocar **Escaneadas / ON / OFF / Latinas / No latinas / España / Por vencer** muestra esas listas; tocar una lista activa abre su información completa.
+- Se conservan todas las listas validadas (también las caídas y las no latinas) solo para esta vista; los archivos .txt y el envío a Telegram siguen usando únicamente lo que pide el modo (p. ej. solo latinas).
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

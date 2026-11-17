@@ -21,7 +21,7 @@ fun escanearTextoLocal(nombreArchivo: String, contenido: String): Flow<EventoEsc
         val credenciales = extraerCredencialesXtream(enlace)
         if (credenciales != null) {
             val validada = validarYEnriquecer(credenciales, nombreArchivo)
-            emit(EventoEscaneo.Validada(validada.activa, validada.esLatino, validada.esEspana))
+            emit(EventoEscaneo.Validada(validada))
             if (validada.activa && validada.esLatino) {
                 emit(EventoEscaneo.ListaEncontrada(validada))
             }
