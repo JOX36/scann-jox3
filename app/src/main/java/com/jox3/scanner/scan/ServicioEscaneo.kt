@@ -32,8 +32,8 @@ class ServicioEscaneo : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val texto = intent?.getStringExtra(EXTRA_TEXTO) ?: "Escaneando…"
-        crearCanal()
-        val notificacion = construirNotificacion(texto)
+        enEjecucion = true
+        val notificacion = construirNotificacion(this, texto)
         ServiceCompat.startForeground(
             this,
             ID_NOTIFICACION,
@@ -51,37 +51,36 @@ class ServicioEscaneo : Service() {
     }
 
     override fun onDestroy() {
+        enEjecucion = false
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
         super.onDestroy()
     }
 
-    private fun crearCanal() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val nm = getSystemService(NotificationManager::class.java)
-            nm.createNotificationChannel(
-                NotificationChannel(CANAL, "Escaneo en curso", NotificationManager.IMPORTANCE_LOW),
-            )
-        }
-    }
-
-    private fun construirNotificacion(texto: String): Notification {
-        val abrir = packageManager.getLaunchIntentForPackage(packageName)?.let {
-            android.app.PendingIntent.getActivity(
-                this, 0, it, android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
-            )
-        }
-        return NotificationCompat.Builder(this, CANAL)
-            .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("IPTV Scanner escaneando")
-            .setContentText(texto)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setContentIntent(abrir)
-            .build()
-    }
-
     companion object {
+        @Volatile private var enEjecucion = false
+
+        private fun construirNotificacion(contexto: Context, texto: String): Notification {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                contexto.getSystemService(NotificationManager::class.java).createNotificationChannel(
+                    NotificationChannel(CANAL, "Escaneo en curso", NotificationManager.IMPORTANCE_LOW),
+                )
+            }
+            val abrir = contexto.packageManager.getLaunchIntentForPackage(contexto.packageName)?.let {
+                android.app.PendingIntent.getActivity(
+                    contexto, 0, it, android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+                )
+            }
+            return NotificationCompat.Builder(contexto, CANAL)
+                .setSmallIcon(android.R.drawable.stat_sys_download)
+                .setContentTitle("IPTV Scanner escaneando")
+                .setContentText(texto)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setContentIntent(abrir)
+                .build()
+        }
+
         private const val CANAL = "escaneo"
         private const val ID_NOTIFICACION = 4201
         private const val EXTRA_TEXTO = "texto"
@@ -114,14 +113,27 @@ class ServicioEscaneo : Service() {
             runCatching { nm.notify(ID_AVISO, n) } // sin permiso de notificaciones simplemente no se muestra
         }
 
-        /** Inicia el servicio, o solo actualiza el texto de la notificación si ya está activo. */
+        /**
+         * Inicia el servicio, o solo actualiza el texto de la notificación si ya está activo.
+         * Con el servicio ya en marcha se actualiza con `notify` (sin volver a llamar a
+         * `startForegroundService`, que desde segundo plano en Android 12+ puede lanzar
+         * ForegroundServiceStartNotAllowedException y cerrar la app). Todo va protegido:
+         * un fallo del aviso nunca debe tumbar el escaneo.
+         */
         fun iniciarOActualizar(contexto: Context, texto: String) {
-            val intent = Intent(contexto, ServicioEscaneo::class.java).putExtra(EXTRA_TEXTO, texto)
-            androidx.core.content.ContextCompat.startForegroundService(contexto, intent)
+            runCatching {
+                if (enEjecucion) {
+                    contexto.getSystemService(NotificationManager::class.java)
+                        .notify(ID_NOTIFICACION, construirNotificacion(contexto, texto))
+                } else {
+                    val intent = Intent(contexto, ServicioEscaneo::class.java).putExtra(EXTRA_TEXTO, texto)
+                    androidx.core.content.ContextCompat.startForegroundService(contexto, intent)
+                }
+            }
         }
 
         fun detener(contexto: Context) {
-            contexto.stopService(Intent(contexto, ServicioEscaneo::class.java))
+            runCatching { contexto.stopService(Intent(contexto, ServicioEscaneo::class.java)) }
         }
     }
 }
