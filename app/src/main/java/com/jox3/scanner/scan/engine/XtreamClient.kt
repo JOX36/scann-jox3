@@ -6,6 +6,10 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.client.request.prepareGet
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.isSuccess
+import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -200,36 +204,46 @@ object XtreamClient {
      * [ValidadorListas]) como para mostrar la cantidad real de canales
      * (`canales` en el diseño de Resultados), sin pedirlo dos veces.
      */
-    suspend fun obtenerCanales(cred: CredencialesXtream): List<String> {
-        return runCatching {
-            val canales: List<CanalLive> = NetworkModule.cliente.get(urlPlayerApi(cred)) {
-                parameter("username", cred.username)
-                parameter("password", cred.password)
-                parameter("action", "get_live_streams")
-                timeout { requestTimeoutMillis = TIMEOUT_LISTADO_GRANDE_MS; socketTimeoutMillis = TIMEOUT_LISTADO_GRANDE_MS }
-            }.body()
-            canales.mapNotNull { it.name }
-        }.getOrDefault(emptyList())
-    }
+    suspend fun obtenerCanales(cred: CredencialesXtream): ResumenArrayJson? =
+        resumirListado(cred, "get_live_streams", MUESTRA_NOMBRES)
+
+    /** Cuántos nombres se conservan de cada listado grande (suficiente para la detección LATAM). */
+    private const val MUESTRA_NOMBRES = 300
 
     /**
-     * Cantidad de elementos de `get_vod_streams`/`get_series` — igual que
-     * `fetch_stream_count()` en Python: no interesa el contenido de cada
-     * elemento, solo cuántos hay, así que se decodifica como lista de
-     * [JsonElement] genérico para no depender de la forma exacta que use
-     * cada panel.
+     * Pide un listado grande y lo recorre EN STREAMING: solo cuenta elementos y guarda una
+     * muestra de nombres. Cargarlo entero (decenas de miles de objetos × hasta 50 listas a la
+     * vez) agotaba el heap y cerraba la app con OutOfMemoryError a mitad del escaneo.
      */
-    private suspend fun contarStream(cred: CredencialesXtream, accion: String): Int? {
-        return runCatching {
-            val elementos: List<JsonElement> = NetworkModule.cliente.get(urlPlayerApi(cred)) {
+    private suspend fun resumirListado(cred: CredencialesXtream, accion: String, maxNombres: Int): ResumenArrayJson? {
+        return try {
+            NetworkModule.cliente.prepareGet(urlPlayerApi(cred)) {
                 parameter("username", cred.username)
                 parameter("password", cred.password)
                 parameter("action", accion)
                 timeout { requestTimeoutMillis = TIMEOUT_LISTADO_GRANDE_MS; socketTimeoutMillis = TIMEOUT_LISTADO_GRANDE_MS }
-            }.body()
-            elementos.size
-        }.getOrNull()
+            }.execute { respuesta ->
+                if (!respuesta.status.isSuccess()) {
+                    null
+                } else {
+                    withContext(Dispatchers.IO) {
+                        respuesta.bodyAsChannel().toInputStream().reader(Charsets.UTF_8).use { resumirArrayJson(it, maxNombres) }
+                    }
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            null
+        }
     }
+
+    /**
+     * Cantidad de elementos de `get_vod_streams`/`get_series` — igual que
+     * `fetch_stream_count()` en Python: solo interesa cuántos hay (se cuenta en streaming).
+     */
+    private suspend fun contarStream(cred: CredencialesXtream, accion: String): Int? =
+        resumirListado(cred, accion, 0)?.cantidad
 
     /** Cantidad de películas (VOD) del panel — equivalente a `movies` en Python. */
     suspend fun obtenerCantidadPeliculas(cred: CredencialesXtream): Int? = contarStream(cred, "get_vod_streams")

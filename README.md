@@ -666,6 +666,12 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - El control del servicio en primer plano y el aviso "Escaneo terminado" pasaron de la pantalla al ViewModel (`EstadoApp.visible` indica si la app está a la vista), así funcionan aunque la pantalla no exista.
 - El motivo del cierre solo cita el registro de Android si es posterior al último guardado del escaneo; si no, indica que se cortó al cerrarse la pantalla (se acabó culpar a una instalación antigua).
 
+## Etapa 27 — Se acabó el cierre por falta de memoria
+
+- **Causa real del cierre** (la mostró el propio diagnóstico): `OutOfMemoryError`. Cada lista validada descargaba y cargaba entero el listado de canales, películas y series (decenas de miles de objetos) y con hasta 50 validaciones a la vez se agotaba el heap de 256 MB.
+- Ahora esos listados se leen en streaming (`resumirArrayJson`): solo se cuenta cuántos elementos hay y se guarda una muestra de 300 nombres para la detección LATAM. El uso de memoria ya no depende del tamaño del panel.
+- `largeHeap` activado como margen extra.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

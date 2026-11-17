@@ -60,7 +60,7 @@ suspend fun validarYEnriquecer(cred: CredencialesXtream, origenChat: String): Li
     // una espera secuencial más por cada enlace si se hiciera una por una,
     // y con hasta 50 enlaces validándose a la vez eso suma rápido.
     lateinit var categorias: List<String>
-    lateinit var canales: List<String>
+    var canales: ResumenArrayJson?
     var peliculas: Int?
     var series: Int?
     var ip: String?
@@ -78,8 +78,8 @@ suspend fun validarYEnriquecer(cred: CredencialesXtream, origenChat: String): Li
     }
     var analisis = analizarContenido(categorias)
 
-    if (!analisis.esLatino && canales.isNotEmpty()) {
-        analisis = analizarContenido(categorias + canales.take(MUESTRA_CANALES_PARA_LATINO))
+    if (!analisis.esLatino && !canales?.nombres.isNullOrEmpty()) {
+        analisis = analizarContenido(categorias + canales!!.nombres.take(MUESTRA_CANALES_PARA_LATINO))
     }
     val esLatino = analisis.esLatino
     val porcentaje = analisis.proporcionLatino
@@ -95,7 +95,7 @@ suspend fun validarYEnriquecer(cred: CredencialesXtream, origenChat: String): Li
         conexionesMax = info.conexionesMax,
         esPrueba = info.esPrueba,
         zonaHoraria = info.zonaHoraria,
-        cantidadCanales = canales.size.takeIf { it > 0 },
+        cantidadCanales = canales?.cantidad?.takeIf { it > 0 },
         cantidadPeliculas = peliculas,
         cantidadSeries = series,
         fechaVencimiento = info.fechaVencimiento,
