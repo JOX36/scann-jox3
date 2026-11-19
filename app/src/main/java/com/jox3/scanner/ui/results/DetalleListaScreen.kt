@@ -75,6 +75,20 @@ fun DetalleListaScreen(
         Toast.makeText(contexto, "$etiqueta copiado", Toast.LENGTH_SHORT).show()
     }
 
+    /**
+     * Abre JOX3 TV con `jox3://add?url=<M3U codificado>`: JOX3 TV pide confirmación, valida la
+     * cuenta y la guarda. Se apunta al paquete de JOX3 TV para que ninguna otra app lo intercepte.
+     */
+    fun abrirEnJox3Tv() {
+        val enlace = android.net.Uri.parse("jox3://add?url=" + android.net.Uri.encode(cred.urlOriginal))
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, enlace).setPackage("com.jox3.iptvexo")
+        try {
+            contexto.startActivity(intent)
+        } catch (e: android.content.ActivityNotFoundException) {
+            Toast.makeText(contexto, "JOX3 TV no está instalada o hay que actualizarla a la última versión.", Toast.LENGTH_LONG).show()
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -104,6 +118,12 @@ fun DetalleListaScreen(
             Spacer(Modifier.height(12.dp))
         }
 
+        if (lista.activa) {
+            Button(onClick = { abrirEnJox3Tv() }, modifier = Modifier.fillMaxWidth()) {
+                Text("▶  Abrir en JOX3 TV")
+            }
+            Spacer(Modifier.height(12.dp))
+        }
         Text("Copiar enlaces", color = TextoSecundario, fontSize = 12.sp)
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {

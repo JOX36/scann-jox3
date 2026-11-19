@@ -700,6 +700,11 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - Tocar **Escaneadas / ON / OFF / Latinas / No latinas / España / Por vencer** muestra esas listas; tocar una lista activa abre su información completa.
 - Se conservan todas las listas validadas (también las caídas y las no latinas) solo para esta vista; los archivos .txt y el envío a Telegram siguen usando únicamente lo que pide el modo (p. ej. solo latinas).
 
+## Etapa 32 — "Abrir en JOX3 TV"
+
+- En el detalle de una lista activa hay un botón **Abrir en JOX3 TV**: abre el reproductor con `jox3://add?url=<M3U>`; JOX3 TV pide confirmación, valida la cuenta y la agrega.
+- Si JOX3 TV no está instalada (o es anterior al enlace `jox3://add`) se avisa con un mensaje en vez de fallar.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
