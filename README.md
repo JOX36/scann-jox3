@@ -719,6 +719,12 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - Buscador (host, usuario o chat) y filtros: Todas, LATAM, Vigentes, Por vencer, Caídas/vencidas.
 - Tocar una lista abre su información completa (con "Abrir en JOX3 TV"); **Revalidar todas** vuelve a comprobarlas (10 a la vez) y marca las que cayeron; **Limpiar caídas** y el icono de papelera las quitan.
 
+## Etapa 35 — Compartir un archivo o texto a JOX3 Radar
+
+- **JOX3 Radar** aparece en "Compartir" (desde un chat, el gestor de archivos, etc.) para archivos de texto / .m3u y para texto suelto, y también en "Abrir con". Al elegirlo se abre la app y se escanean sus enlaces como en el modo "archivo local" (resultados con resumen, Bodega y filtros).
+- El escaneo de archivo local ahora es **en paralelo** (30 a la vez, tope de 150 s por lista) en vez de uno por uno.
+- Si ya hay un escaneo en curso avisa y no lo interrumpe. Límite de lectura: 8 MB.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
