@@ -431,9 +431,8 @@ class ScanFlowViewModel(
     /** Escanea un archivo .txt local, ya leído por la UI vía Storage Access Framework. */
     fun escanearArchivoLocal(nombreArchivo: String, contenido: String) {
         nombreArchivoActual = "Resultados_Latinos_" + ResultadosExportador.nombreArchivoSeguro(nombreArchivo.substringBeforeLast('.'))
-        // Host y cantidad solo existen en los modos "buscar un host".
-        hostActual = filtroHost
-        if (filtroHost == null) limiteListas = null
+        hostActual = null
+        limiteListas = null
         encontradasActuales = emptyList()
         erroresActuales = emptyList()
         diagnosticoActual = emptyList()
@@ -460,6 +459,9 @@ class ScanFlowViewModel(
                 if (chats.size == 1) ResultadosExportador.nombreArchivoSeguro(chats[0].titulo) else "varios_chats"
             else -> "Resultados_IPTV"
         }
+        // Host y cantidad solo existen en los modos "buscar un host".
+        hostActual = filtroHost
+        if (filtroHost == null) limiteListas = null
         encontradasActuales = emptyList()
         erroresActuales = emptyList()
         diagnosticoActual = emptyList()
