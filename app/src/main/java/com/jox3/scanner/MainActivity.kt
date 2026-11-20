@@ -14,6 +14,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Lock
+import com.jox3.scanner.scan.bodega.diasHoy
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.border
@@ -148,6 +150,7 @@ class MainActivity : ComponentActivity() {
 private enum class Pestana(val etiqueta: String, val icono: androidx.compose.ui.graphics.vector.ImageVector) {
     BUSCAR("Buscar", Icons.Filled.Search),
     RESULTADOS("Resultados", Icons.AutoMirrored.Filled.List),
+    BODEGA("Bodega", Icons.Filled.Lock),
     VERIFICADOR("Verificar", Icons.Filled.CheckCircle),
     AJUSTES("Ajustes", Icons.Filled.Settings),
 }
@@ -177,6 +180,11 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
         factory = com.jox3.scanner.verificador.VerificadorViewModelFactory(contextoVerificador),
     )
     val estadoVerificador by verificadorViewModel.estado.collectAsState()
+    val bodegaViewModel: com.jox3.scanner.scan.bodega.BodegaViewModel = viewModel(
+        viewModelStoreOwner = com.jox3.scanner.scan.AlmacenViewModelsProceso,
+        factory = com.jox3.scanner.scan.bodega.BodegaViewModelFactory(contextoVerificador),
+    )
+    val detalleBodega by bodegaViewModel.detalleEntrada.collectAsState()
 
     // Permiso de notificaciones (Android 13+) la primera vez que se escanea; el servicio y los
     // avisos los gestiona el propio ViewModel (ver ScanFlowViewModel.vigilarServicio).
@@ -235,6 +243,9 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
     BackHandler(enabled = pestanaActual == Pestana.VERIFICADOR.ordinal && estadoVerificador.lista != null) {
         verificadorViewModel.nueva()
     }
+    BackHandler(enabled = pestanaActual == Pestana.BODEGA.ordinal && detalleBodega != null) {
+        bodegaViewModel.cerrarDetalle()
+    }
     BackHandler(enabled = pestanaActual != Pestana.BUSCAR.ordinal) { pestanaActual = Pestana.BUSCAR.ordinal }
 
     Scaffold(
@@ -250,6 +261,10 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
                     when (Pestana.entries[indice]) {
                         Pestana.BUSCAR -> scanViewModel.irABuscar()
                         Pestana.RESULTADOS -> scanViewModel.irAResultados()
+                        Pestana.BODEGA -> {
+                            if (pestanaActual == indice) bodegaViewModel.cerrarDetalle()
+                            bodegaViewModel.refrescar()
+                        }
                         Pestana.VERIFICADOR -> if (pestanaActual == indice) verificadorViewModel.nueva()
                         Pestana.AJUSTES -> Unit
                     }
@@ -262,6 +277,31 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
             when (Pestana.entries[pestanaActual]) {
                 Pestana.BUSCAR -> PantallaEscaneo(estadoEscaneo, scanViewModel)
                 Pestana.RESULTADOS -> PantallaResultadosTab(estadoEscaneo, scanViewModel)
+                Pestana.BODEGA -> {
+                    val entradas by bodegaViewModel.entradas.collectAsState()
+                    val revalidacion by bodegaViewModel.revalidacion.collectAsState()
+                    val abierta = detalleBodega
+                    if (abierta == null) {
+                        com.jox3.scanner.ui.bodega.BodegaScreen(
+                            entradas = entradas,
+                            revalidacion = revalidacion,
+                            onAbrir = bodegaViewModel::abrirDetalle,
+                            onEliminar = bodegaViewModel::eliminar,
+                            onRevalidar = bodegaViewModel::revalidarTodas,
+                            onLimpiar = bodegaViewModel::limpiarCaidasYVencidas,
+                        )
+                    } else {
+                        val info by bodegaViewModel.detalleInfo.collectAsState()
+                        val cargandoInfo by bodegaViewModel.detalleCargando.collectAsState()
+                        DetalleListaConectada(
+                            lista = abierta.lista.copy(diasRestantes = abierta.lista.diasHoy()),
+                            detalle = info,
+                            cargando = cargandoInfo,
+                            onVolver = bodegaViewModel::cerrarDetalle,
+                            onConsultar = bodegaViewModel::consultarDetalle,
+                        )
+                    }
+                }
                 Pestana.VERIFICADOR -> {
                     val listaVerificada = estadoVerificador.lista
                     if (listaVerificada == null) {

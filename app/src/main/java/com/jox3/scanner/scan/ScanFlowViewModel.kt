@@ -166,6 +166,7 @@ class ScanFlowViewModel(
     private var resumenActual = ResumenEscaneo()
     private val validadasActuales = mutableListOf<ListaValidada>()
     private var hostActual: String? = null
+    private val pendientesBodega = mutableListOf<ListaValidada>()
     private var limiteListas: Int? = null
 
     // Detalle de una lista puntual (pedido explícito del usuario: poder
@@ -487,12 +488,24 @@ class ScanFlowViewModel(
      * resultados parciales" del diseño.
      */
     fun detenerYVerParciales() {
+        volcarABodega()
         scanJob?.cancel()
         scanJob = null
         val parcial = construirResultados(encontradasActuales, erroresActuales, diagnosticoActual, registroActual)
         respaldar(encontradasActuales, erroresActuales, diagnosticoActual, enCurso = false)
         _ultimoResultado.value = parcial
         _estado.value = parcial
+    }
+
+    /** Guarda en la Bodega las listas activas pendientes (en lotes, para no escribir el archivo a cada lista). */
+    private fun volcarABodega() {
+        if (pendientesBodega.isEmpty()) return
+        val ctx = contextoApp ?: run { pendientesBodega.clear(); return }
+        val lote = pendientesBodega.toList()
+        pendientesBodega.clear()
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { com.jox3.scanner.scan.bodega.RepositorioBodega.agregar(ctx.filesDir, lote) }
+        }
     }
 
     /** Arma el estado final con el resumen (mensajes leídos y duración salen del estado de escaneo vigente). */
@@ -545,6 +558,10 @@ class ScanFlowViewModel(
             is EventoEscaneo.Validada -> {
                 val v = evento.lista
                 validadasActuales += v
+                if (v.activa) {
+                    pendientesBodega += v
+                    if (pendientesBodega.size >= 10) volcarABodega()
+                }
                 resumenActual = resumenActual.copy(
                     activas = resumenActual.activas + if (v.activa) 1 else 0,
                     caidas = resumenActual.caidas + if (v.activa) 0 else 1,
@@ -596,6 +613,7 @@ class ScanFlowViewModel(
             }
             EventoEscaneo.Finalizado -> {
                 scanJob = null
+                volcarABodega()
                 val resultadoFinal = construirResultados(encontradas.toList(), errores.toList(), diagnostico.toList(), registro.toList())
                 respaldar(encontradas, errores, diagnostico, enCurso = false)
                 _ultimoResultado.value = resultadoFinal

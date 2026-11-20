@@ -711,6 +711,14 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - En cuanto se juntan esas listas activas el escaneo se detiene solo y muestra los resultados (sin seguir leyendo ni validando).
 - Si hay menos de las pedidas se muestran las que se encontraron y un aviso amarillo ("Pediste N y solo se encontraron M"); si no hay ninguna, un aviso rojo dice claramente que no se encontró el host.
 
+## Etapa 34 — Pestaña "Bodega"
+
+- Nueva pestaña **Bodega**: cada lista activa que encuentre un escaneo (o que verifiques en "Verificar") se guarda sola, se envíe o no a Telegram. Se guarda en un archivo privado del teléfono (`bodega.json`, ~1 MB por unas miles de listas; la app no se respalda en la nube).
+- Sin duplicados: misma lista = mismo servidor + usuario (se actualiza con los datos más recientes).
+- Orden: host de A a Z y, dentro de cada host, de más a menos días de vigencia. Los días se calculan HOY desde la fecha de vencimiento, así siempre están al día.
+- Buscador (host, usuario o chat) y filtros: Todas, LATAM, Vigentes, Por vencer, Caídas/vencidas.
+- Tocar una lista abre su información completa (con "Abrir en JOX3 TV"); **Revalidar todas** vuelve a comprobarlas (10 a la vez) y marca las que cayeron; **Limpiar caídas** y el icono de papelera las quitan.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

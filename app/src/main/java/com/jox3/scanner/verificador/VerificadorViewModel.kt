@@ -59,6 +59,11 @@ class VerificadorViewModel(private val contextoApp: android.content.Context? = n
                 avisar("La lista no está activa o no respondió.")
                 return@launch
             }
+            contextoApp?.let { c ->
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    runCatching { com.jox3.scanner.scan.bodega.RepositorioBodega.agregar(c.filesDir, listOf(lista)) }
+                }
+            }
             _estado.update { it.copy(verificando = false, lista = lista, detalle = null, detalleCargando = true) }
             val detalle = runCatching { consultarDetalleLista(lista) }.getOrNull()
             _estado.update { it.copy(detalle = detalle, detalleCargando = false) }
