@@ -340,6 +340,8 @@ private fun PantallaResultadosTab(estado: EstadoFlujoEscaneo, viewModel: ScanFlo
                     nombreArchivo = estado.nombreArchivo,
                     resumen = estado.resumen,
                     todas = estado.todas,
+                    hostBuscado = estado.hostBuscado,
+                    cantidadPedida = estado.cantidadPedida,
                 )
             }
         }
@@ -443,7 +445,7 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
         }
 
         is EstadoFlujoEscaneo.EscribiendoHost -> {
-            HostInputScreen(onHostConfirmado = viewModel::hostConfirmado, onVolver = viewModel::volver)
+            HostInputScreen(onHostConfirmado = { h, n -> viewModel.hostConfirmado(h, n) }, onVolver = viewModel::volver)
         }
 
         is EstadoFlujoEscaneo.EligiendoChatUnico -> {
@@ -504,6 +506,8 @@ private fun PantallaEscaneo(estado: EstadoFlujoEscaneo, viewModel: ScanFlowViewM
                     nombreArchivo = s.nombreArchivo,
                     resumen = s.resumen,
                     todas = s.todas,
+                    hostBuscado = s.hostBuscado,
+                    cantidadPedida = s.cantidadPedida,
                 )
             }
         }
@@ -529,6 +533,8 @@ private fun ResultsScreenConectada(
     nombreArchivo: String = "Resultados_IPTV",
     resumen: com.jox3.scanner.scan.ResumenEscaneo? = null,
     todas: List<ListaValidada> = emptyList(),
+    hostBuscado: String? = null,
+    cantidadPedida: Int? = null,
 ) {
     val contexto = LocalContext.current
     val credencialesBot = remember { CredencialesBotTelegram(contexto) }
@@ -537,6 +543,8 @@ private fun ResultsScreenConectada(
     ResultsScreen(
         resumen = resumen,
         todas = todas,
+        hostBuscado = hostBuscado,
+        cantidadPedida = cantidadPedida,
         listas = listas,
         errores = errores,
         diagnostico = diagnostico,

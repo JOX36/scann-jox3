@@ -705,6 +705,12 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - En el detalle de una lista activa hay un botón **Abrir en JOX3 TV**: abre el reproductor con `jox3://add?url=<M3U>`; JOX3 TV pide confirmación, valida la cuenta y la agrega.
 - Si JOX3 TV no está instalada (o es anterior al enlace `jox3://add`) se avisa con un mensaje en vez de fallar.
 
+## Etapa 33 — Buscar un host: cuántas listas necesitas
+
+- Al buscar un host (en todos los chats o en uno) ahora se pregunta **cuántas listas de ese host necesitas** (vacío = todas las que aparezcan).
+- En cuanto se juntan esas listas activas el escaneo se detiene solo y muestra los resultados (sin seguir leyendo ni validando).
+- Si hay menos de las pedidas se muestran las que se encontraron y un aviso amarillo ("Pediste N y solo se encontraron M"); si no hay ninguna, un aviso rojo dice claramente que no se encontró el host.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

@@ -63,6 +63,8 @@ fun ResultsScreen(
     listas: List<ListaValidada>,
     resumen: com.jox3.scanner.scan.ResumenEscaneo? = null,
     todas: List<ListaValidada> = emptyList(),
+    hostBuscado: String? = null,
+    cantidadPedida: Int? = null,
     onEscanearDeNuevo: () -> Unit,
     errores: List<String> = emptyList(),
     diagnostico: List<String> = emptyList(),
@@ -94,6 +96,19 @@ fun ResultsScreen(
         item {
             Text("Resultados", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextoPrimario)
             Spacer(Modifier.height(12.dp))
+            if (hostBuscado != null) {
+                val halladas = activas.size
+                val (texto, color) = when {
+                    halladas == 0 -> "No se encontró ninguna lista activa del host \"$hostBuscado\" en lo que se escaneó." to ErrorApp
+                    cantidadPedida != null && halladas < cantidadPedida ->
+                        "Pediste $cantidadPedida y solo se encontraron $halladas activa(s) del host \"$hostBuscado\"." to AmarilloApp
+                    else -> "Host \"$hostBuscado\": $halladas lista(s) activa(s) encontrada(s)." to AcentoApp
+                }
+                Surface(color = color.copy(alpha = 0.14f), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, color.copy(alpha = 0.5f)), modifier = Modifier.fillMaxWidth()) {
+                    Text(texto, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(12.dp))
+                }
+                Spacer(Modifier.height(12.dp))
+            }
             if (resumen != null) {
                 ResumenFinal(
                     resumen,
@@ -124,6 +139,7 @@ fun ResultsScreen(
                     when {
                         universo.isEmpty() && errores.isNotEmpty() ->
                             "No se encontraron enlaces. Revisa los chats con error abajo: puede ser la causa real."
+                        hostBuscado != null && universo.isEmpty() -> "No hay listas de \"$hostBuscado\". Prueba con otro host o con más chats."
                         universo.isEmpty() -> "No se encontraron enlaces con este modo de búsqueda."
                         else -> "Ninguna lista en esta categoría."
                     },

@@ -131,6 +131,10 @@ sealed class EstadoFlujoEscaneo {
         val resumen: ResumenEscaneo? = null,
         /** TODAS las listas validadas (activas y caídas, LATAM o no): permite elegir qué ver tocando cada contador. No se exporta. */
         val todas: List<ListaValidada> = emptyList(),
+        /** Host buscado (modos "buscar un host"), para decir claramente si no se encontró. */
+        val hostBuscado: String? = null,
+        /** Cuántas listas de ese host se pidieron (`null` = todas las que haya). */
+        val cantidadPedida: Int? = null,
     ) : EstadoFlujoEscaneo()
 }
 
@@ -161,6 +165,8 @@ class ScanFlowViewModel(
     private var registroActual: List<String> = emptyList()
     private var resumenActual = ResumenEscaneo()
     private val validadasActuales = mutableListOf<ListaValidada>()
+    private var hostActual: String? = null
+    private var limiteListas: Int? = null
 
     // Detalle de una lista puntual (pedido explícito del usuario: poder
     // tocar un resultado y consultar su info extra sin ir a Telegram).
@@ -287,11 +293,13 @@ class ScanFlowViewModel(
         }
     }
 
-    fun hostConfirmado(host: String) {
+    /** [cantidad]: cuántas listas del host se necesitan (`null` = todas las que aparezcan). */
+    fun hostConfirmado(host: String, cantidad: Int? = null) {
         val actual = _estado.value
         if (actual !is EstadoFlujoEscaneo.EscribiendoHost) return
         val hostLimpio = host.trim()
         if (hostLimpio.isBlank()) return
+        limiteListas = cantidad?.takeIf { it > 0 }
 
         when (actual.modo) {
             TipoModo.HOST_EN_TODOS_LOS_CHATS ->
@@ -423,6 +431,9 @@ class ScanFlowViewModel(
     /** Escanea un archivo .txt local, ya leído por la UI vía Storage Access Framework. */
     fun escanearArchivoLocal(nombreArchivo: String, contenido: String) {
         nombreArchivoActual = "Resultados_Latinos_" + ResultadosExportador.nombreArchivoSeguro(nombreArchivo.substringBeforeLast('.'))
+        // Host y cantidad solo existen en los modos "buscar un host".
+        hostActual = filtroHost
+        if (filtroHost == null) limiteListas = null
         encontradasActuales = emptyList()
         erroresActuales = emptyList()
         diagnosticoActual = emptyList()
@@ -491,7 +502,7 @@ class ScanFlowViewModel(
             mensajes = e?.let { it.mensajesChatsTerminados + it.mensajesChatActual } ?: 0,
             duracionSeg = e?.let { (System.currentTimeMillis() - it.inicioMs) / 1000 } ?: 0,
         )
-        return EstadoFlujoEscaneo.Resultados(listas, errores, diagnostico, registro, nombreArchivoActual, resumen, validadasActuales.toList())
+        return EstadoFlujoEscaneo.Resultados(listas, errores, diagnostico, registro, nombreArchivoActual, resumen, validadasActuales.toList(), hostActual, limiteListas)
     }
 
     private fun procesarEvento(
@@ -520,6 +531,13 @@ class ScanFlowViewModel(
                 val estadoActual = _estado.value
                 if (estadoActual is EstadoFlujoEscaneo.Escaneando) {
                     _estado.value = estadoActual.copy(encontradas = encontradas.toList())
+                }
+                // Ya se juntaron las listas pedidas del host: no hace falta seguir leyendo ni validando.
+                val limite = limiteListas
+                if (limite != null && encontradas.count { it.activa } >= limite) {
+                    diagnostico += "✅ Se alcanzó la cantidad pedida ($limite lista(s) activa(s)); se detuvo la búsqueda."
+                    diagnosticoActual = diagnostico.toList()
+                    detenerYVerParciales()
                 }
             }
             is EventoEscaneo.Validada -> {
