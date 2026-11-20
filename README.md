@@ -724,6 +724,7 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - **JOX3 Radar** aparece en "Compartir" (desde un chat, el gestor de archivos, etc.) para archivos de texto / .m3u y para texto suelto, y también en "Abrir con". Al elegirlo se abre la app y se escanean sus enlaces como en el modo "archivo local" (resultados con resumen, Bodega y filtros).
 - El escaneo de archivo local ahora es **en paralelo** (30 a la vez, tope de 150 s por lista) en vez de uno por uno.
 - Si ya hay un escaneo en curso avisa y no lo interrumpe. Límite de lectura: 8 MB.
+- Corrección: el archivo compartido se borraba de la cola antes de leerse y Compose cancelaba la lectura (la app se abría y "no hacía nada"); ahora se borra al final.
 
 ## Nota sobre el CI
 

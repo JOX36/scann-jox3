@@ -256,22 +256,29 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
     val contextoCompartido = LocalContext.current
     LaunchedEffect(compartido) {
         val p = compartido ?: return@LaunchedEffect
-        com.jox3.scanner.scan.ArchivoCompartido.pendiente = null
-        if (estadoEscaneo is EstadoFlujoEscaneo.Escaneando) {
-            android.widget.Toast.makeText(contextoCompartido, "Ya hay un escaneo en curso; comparte el archivo cuando termine.", android.widget.Toast.LENGTH_LONG).show()
-            return@LaunchedEffect
+        // OJO: el pendiente se borra AL FINAL. Si se borrara antes, cambiaría la clave de este
+        // LaunchedEffect y Compose lo cancelaría a mitad de la lectura (el archivo "no hacía nada").
+        try {
+            if (estadoEscaneo is EstadoFlujoEscaneo.Escaneando) {
+                android.widget.Toast.makeText(contextoCompartido, "Ya hay un escaneo en curso; comparte el archivo cuando termine.", android.widget.Toast.LENGTH_LONG).show()
+                return@LaunchedEffect
+            }
+            val leido = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.jox3.scanner.scan.ArchivoCompartido.leer(contextoCompartido, p)
+            }
+            if (leido == null || leido.second.isBlank()) {
+                android.widget.Toast.makeText(contextoCompartido, "No pude leer el archivo compartido.", android.widget.Toast.LENGTH_LONG).show()
+                return@LaunchedEffect
+            }
+            android.widget.Toast.makeText(contextoCompartido, "Escaneando ${leido.first}…", android.widget.Toast.LENGTH_SHORT).show()
+            scanViewModel.cerrarDetalle()
+            pestanaActual = Pestana.BUSCAR.ordinal
+            scanViewModel.escanearArchivoLocal(leido.first, leido.second)
+        } finally {
+            if (com.jox3.scanner.scan.ArchivoCompartido.pendiente === p) {
+                com.jox3.scanner.scan.ArchivoCompartido.pendiente = null
+            }
         }
-        val leido = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            com.jox3.scanner.scan.ArchivoCompartido.leer(contextoCompartido, p)
-        }
-        if (leido == null || leido.second.isBlank()) {
-            android.widget.Toast.makeText(contextoCompartido, "No pude leer el archivo compartido.", android.widget.Toast.LENGTH_LONG).show()
-            return@LaunchedEffect
-        }
-        android.widget.Toast.makeText(contextoCompartido, "Escaneando ${leido.first}…", android.widget.Toast.LENGTH_SHORT).show()
-        scanViewModel.cerrarDetalle()
-        pestanaActual = Pestana.BUSCAR.ordinal
-        scanViewModel.escanearArchivoLocal(leido.first, leido.second)
     }
 
     BackHandler(enabled = pestanaActual == Pestana.BODEGA.ordinal && detalleBodega != null) {
