@@ -726,6 +726,10 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 - Si ya hay un escaneo en curso avisa y no lo interrumpe. Límite de lectura: 8 MB.
 - Corrección: el archivo compartido se borraba de la cola antes de leerse y Compose cancelaba la lectura (la app se abría y "no hacía nada"); ahora se borra al final.
 
+## Etapa 36
+
+La app ahora entiende texto en formato Markdown (mensajes de chats, archivos `.md` compartidos, texto pegado en el Verificador): `[texto](enlace)` extrae solo el enlace, se quitan `**negritas**`, `__subrayados__` y `` `código` `` pegados, y las barras de escape como `\_` se limpian. Así la contraseña ya no se queda con un `)` o `*` al final.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

@@ -66,10 +66,27 @@ private fun decodificarParametro(valor: String): String =
  * script de Python: no valida los parámetros aquí, solo encuentra
  * candidatos — eso lo hace [extraerCredencialesXtream] después.
  */
-private val patronEnlaceM3U = Regex("""https?://[^\s'"<>]+?/get\.php\?[^\s'"<>]+""", RegexOption.IGNORE_CASE)
+private val patronEnlaceM3U = Regex("""https?://[^\s'"<>`]+?/get\.php\?[^\s'"<>`]+""", RegexOption.IGNORE_CASE)
 
 /** Caracteres que de verdad pueden aparecer en una URL — todo lo demás pegado al final se recorta. */
 private val caracterUrlValido = Regex("""[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]""")
+
+private val mdEscape = Regex("""\\([_*\[\]()`~#+.!|>-])""")
+private val mdEnlace = Regex("""\[[^\]\n]*]\((https?://[^)\s]+)\)""", RegexOption.IGNORE_CASE)
+private val mdNegrita = Regex("""(\*\*|__)(?=\S)([^\n]*?\S)\1""")
+
+/**
+ * Deja el texto Markdown como texto plano para que los extractores no
+ * arrastren símbolos: `[txt](url)` -> url, `**x**`/`__x__` -> x, `` `x` `` -> x
+ * y `\_` -> `_`. Si el texto no es Markdown, queda igual.
+ */
+internal fun limpiarMarkdown(texto: String): String {
+    if (texto.none { it == '\\' || it == '[' || it == '*' || it == '_' || it == '`' }) return texto
+    var t = mdEscape.replace(texto) { it.groupValues[1] }
+    t = mdEnlace.replace(t) { " " + it.groupValues[1] + " " }
+    t = mdNegrita.replace(t) { it.groupValues[2] }
+    return t
+}
 
 /**
  * Recorta del final cualquier carácter que no sea válido en una URL (emoji,
@@ -83,13 +100,13 @@ private fun recortarBasuraFinal(enlace: String): String {
 }
 
 fun extraerEnlaces(texto: String): List<String> =
-    patronEnlaceM3U.findAll(texto)
+    patronEnlaceM3U.findAll(limpiarMarkdown(texto))
         .map { recortarBasuraFinal(it.value) }
         .filter { it.contains("get.php?") }
         .distinct()
         .toList()
 
-private val patronUrlCualquiera = Regex("""https?://[^\s'"<>]+""", RegexOption.IGNORE_CASE)
+private val patronUrlCualquiera = Regex("""https?://[^\s'"<>`]+""", RegexOption.IGNORE_CASE)
 
 private fun enlaceM3uDe(host: String, usuario: String, clave: String) =
     "$host/get.php?username=$usuario&password=$clave&type=m3u_plus"
@@ -104,7 +121,8 @@ private fun valorEtiquetado(texto: String, etiquetas: String): String? =
  * resultado que da la propia app: "Host: …", "Usuario: …", "Contraseña: …"),
  * o una línea `host|usuario|clave` / `host usuario clave`.
  */
-fun extraerCredencialesDeTexto(texto: String): CredencialesXtream? {
+fun extraerCredencialesDeTexto(textoCrudo: String): CredencialesXtream? {
+    val texto = limpiarMarkdown(textoCrudo)
     for (coincidencia in patronUrlCualquiera.findAll(texto)) {
         val url = recortarBasuraFinal(coincidencia.value)
         val cred = extraerCredencialesXtream(url) ?: continue
