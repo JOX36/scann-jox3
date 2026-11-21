@@ -48,6 +48,7 @@ import com.jox3.scanner.ui.theme.TextoSecundario
 private enum class FiltroBodega(val etiqueta: String) {
     TODAS("Todas"),
     LATAM("LATAM"),
+    OTRAS("Otras"),
     VIGENTES("Vigentes"),
     POR_VENCER("Por vencer"),
     CAIDAS("Caídas / vencidas"),
@@ -82,6 +83,7 @@ fun BodegaScreen(
             val pasaFiltro = when (filtro) {
                 FiltroBodega.TODAS -> true
                 FiltroBodega.LATAM -> e.lista.esLatino
+                FiltroBodega.OTRAS -> !e.lista.esLatino
                 FiltroBodega.VIGENTES -> !e.caida()
                 FiltroBodega.POR_VENCER -> !e.caida() && dias != null && dias < DIAS_POR_VENCER
                 FiltroBodega.CAIDAS -> e.caida()

@@ -730,6 +730,10 @@ Reportado con capturas: chats (incluso un solo tema) fallaban seguido con
 
 La app ahora entiende texto en formato Markdown (mensajes de chats, archivos `.md` compartidos, texto pegado en el Verificador): `[texto](enlace)` extrae solo el enlace, se quitan `**negritas**`, `__subrayados__` y `` `código` `` pegados, y las barras de escape como `\_` se limpian. Así la contraseña ya no se queda con un `)` o `*` al final.
 
+## Etapa 37
+
+La Bodega tiene un nuevo filtro **Otras** (listas no latinas), junto al de **LATAM**, para separarlas fácilmente.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
