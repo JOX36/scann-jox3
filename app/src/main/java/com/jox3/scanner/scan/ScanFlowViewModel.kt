@@ -75,6 +75,8 @@ sealed class EstadoFlujoEscaneo {
         val seleccionados: Set<Long>,
         /** `true` cuando se llegó desde "Contenido LATINO en varios chats": solo se quedan listas LATAM. */
         val soloLatino: Boolean = false,
+        /** Host a buscar en los chats marcados (modo "host en varios chats"); `null` en los demás modos. */
+        val host: String? = null,
     ) : EstadoFlujoEscaneo()
 
     /** Comprobando si algún chat elegido es un grupo con "Temas" antes de escanear. */
@@ -303,8 +305,12 @@ class ScanFlowViewModel(
         limiteListas = cantidad?.takeIf { it > 0 }
 
         when (actual.modo) {
-            TipoModo.HOST_EN_TODOS_LOS_CHATS ->
-                iniciarEscaneo(actual.chats, filtroHost = hostLimpio, soloLatino = false)
+            TipoModo.HOST_EN_TODOS_LOS_CHATS -> {
+                val ids = actual.chats.map { it.id }.toSet()
+                _estado.value = EstadoFlujoEscaneo.SeleccionandoChats(
+                    actual.chats, ultimaSeleccionHost.filter { it in ids }.toSet(), soloLatino = false, host = hostLimpio,
+                )
+            }
             TipoModo.HOST_EN_UN_CHAT ->
                 _estado.value = EstadoFlujoEscaneo.EligiendoChatUnico(actual.chats, host = hostLimpio, origenModo = TipoModo.HOST_EN_UN_CHAT)
             else -> Unit
@@ -336,7 +342,9 @@ class ScanFlowViewModel(
         when (val actual = _estado.value) {
             is EstadoFlujoEscaneo.EligiendoTemas -> _estado.value = actual.anterior
             is EstadoFlujoEscaneo.EscribiendoHost -> volverAElegirModo()
-            is EstadoFlujoEscaneo.SeleccionandoChats -> volverAElegirModo()
+            is EstadoFlujoEscaneo.SeleccionandoChats ->
+                if (actual.host != null) _estado.value = EstadoFlujoEscaneo.EscribiendoHost(actual.chats, TipoModo.HOST_EN_TODOS_LOS_CHATS)
+                else volverAElegirModo()
             is EstadoFlujoEscaneo.EligiendoChatUnico -> {
                 if (actual.origenModo == TipoModo.HOST_EN_UN_CHAT) {
                     _estado.value = EstadoFlujoEscaneo.EscribiendoHost(actual.chats, TipoModo.HOST_EN_UN_CHAT)
@@ -347,6 +355,9 @@ class ScanFlowViewModel(
             else -> Unit
         }
     }
+
+    /** Chats marcados la última vez que se buscó un host (se recuerdan mientras la app siga en memoria). */
+    private var ultimaSeleccionHost: Set<Long> = emptySet()
 
     fun alternarSeleccion(chatId: Long) {
         val actual = _estado.value
@@ -363,7 +374,8 @@ class ScanFlowViewModel(
         val actual = _estado.value
         if (actual !is EstadoFlujoEscaneo.SeleccionandoChats || actual.seleccionados.isEmpty()) return
         val chatsElegidos = actual.chats.filter { it.id in actual.seleccionados }
-        prepararEscaneo(chatsElegidos, filtroHost = null, soloLatino = actual.soloLatino)
+        if (actual.host != null) ultimaSeleccionHost = actual.seleccionados
+        prepararEscaneo(chatsElegidos, filtroHost = actual.host, soloLatino = actual.soloLatino)
     }
 
     /**

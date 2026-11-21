@@ -63,8 +63,8 @@ fun ModoEscaneoScreen(onModoElegido: (TipoModo) -> Unit) {
         )
         OpcionModo(
             icono = "🌐",
-            titulo = "Buscar un host en todos los chats",
-            descripcion = "Escribe un dominio/host y lo busca en todos tus chats, sin elegir uno a uno.",
+            titulo = "Buscar un host en varios chats",
+            descripcion = "Escribe un dominio/host y marca solo los chats donde quieres buscarlo.",
             onClick = { onModoElegido(TipoModo.HOST_EN_TODOS_LOS_CHATS) },
         )
         OpcionModo(

@@ -734,6 +734,10 @@ La app ahora entiende texto en formato Markdown (mensajes de chats, archivos `.m
 
 La Bodega tiene un nuevo filtro **Otras** (listas no latinas), junto al de **LATAM**, para separarlas fácilmente.
 
+## Etapa 38
+
+"Buscar un host en todos los chats" pasa a ser **"Buscar un host en varios chats"**: después de escribir el host (y la cantidad) eliges con casillas en qué chats buscar, con buscador y filtro por tipo, para no leer chats que nada tienen que ver con IPTV. La app recuerda los chats marcados la vez anterior mientras siga en memoria. El botón Volver regresa a escribir el host.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
