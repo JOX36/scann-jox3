@@ -738,6 +738,10 @@ La Bodega tiene un nuevo filtro **Otras** (listas no latinas), junto al de **LAT
 
 "Buscar un host en todos los chats" pasa a ser **"Buscar un host en varios chats"**: después de escribir el host (y la cantidad) eliges con casillas en qué chats buscar, con buscador y filtro por tipo, para no leer chats que nada tienen que ver con IPTV. La app recuerda los chats marcados la vez anterior mientras siga en memoria. El botón Volver regresa a escribir el host.
 
+## Etapa 39
+
+El botón **Detener búsqueda** ahora está siempre visible arriba, bajo la barra de progreso (antes aparecía abajo y solo cuando ya había enlaces por validar, así que durante la lectura de mensajes no se veía). Detiene el escaneo y muestra lo encontrado hasta ese momento.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

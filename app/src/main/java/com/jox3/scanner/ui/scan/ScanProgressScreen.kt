@@ -109,6 +109,18 @@ fun ScanProgressScreen(
             fontSize = 13.sp,
         )
 
+        if (onDetener != null) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onDetener,
+                border = BorderStroke(1.dp, ErrorApp),
+                colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = ErrorApp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("⏹ Detener búsqueda y ver lo encontrado", fontWeight = FontWeight.Bold)
+            }
+        }
+
         if (chatLeyendo != null || mensajesTotales > 0) {
             Spacer(Modifier.height(6.dp))
             val acumulado = mensajesTotales + mensajesChatActual
@@ -161,12 +173,6 @@ fun ScanProgressScreen(
                 EstadisticaCelda("Validaciones/seg", "≈${porSegundo.toInt()}", TextoPrimario, Modifier.weight(1f))
             }
 
-            if (onDetener != null) {
-                Spacer(Modifier.height(16.dp))
-                OutlinedButton(onClick = onDetener, modifier = Modifier.fillMaxWidth()) {
-                    Text("Detener y ver resultados parciales")
-                }
-            }
         }
 
         Spacer(Modifier.height(20.dp))
