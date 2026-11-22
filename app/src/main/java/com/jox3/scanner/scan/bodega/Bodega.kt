@@ -95,7 +95,14 @@ object RepositorioBodega {
                 val actual = mapa[k] ?: continue
                 mapa[k] = when {
                     nueva == null -> actual // sin respuesta a tiempo: no se saca conclusión
-                    nueva.activa -> actual.copy(lista = nueva.copy(origenChat = actual.lista.origenChat), vistaUltima = ahora, vigente = true)
+                    nueva.activa -> {
+                        // Si la consulta de contenido falló esta vez (0 % sin señal alguna), no se pierde lo que ya se sabía.
+                        val conservar = actual.lista.esLatino && !nueva.esLatino && nueva.porcentajeLatino == 0.0
+                        val fusion = if (conservar) {
+                            nueva.copy(esLatino = true, porcentajeLatino = actual.lista.porcentajeLatino, esEspana = false)
+                        } else nueva
+                        actual.copy(lista = fusion.copy(origenChat = actual.lista.origenChat), vistaUltima = ahora, vigente = true)
+                    }
                     else -> actual.copy(vigente = false)
                 }
             }

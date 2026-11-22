@@ -2,6 +2,7 @@ package com.jox3.scanner.scan.engine
 
 import com.jox3.scanner.scan.data.CredencialesXtream
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.coroutines.coroutineScope
 
@@ -76,12 +77,29 @@ suspend fun validarYEnriquecer(cred: CredencialesXtream, origenChat: String): Li
         series = seriesAsync.await()
         ip = ipAsync.await()
     }
-    var analisis = analizarContenido(categorias)
+    var categoriasFinal: List<String> = categorias
+    var nombresCanales: List<String> = canales?.nombres.orEmpty()
 
-    if (!analisis.esLatino && !canales?.nombres.isNullOrEmpty()) {
-        analisis = analizarContenido(categorias + canales!!.nombres.take(MUESTRA_CANALES_PARA_LATINO))
+    // Un panel con pocas conexiones permitidas rechaza las consultas cuando se validan
+    // varias listas suyas a la vez: las categorías llegaban vacías y la lista salía como
+    // "no latina" aunque lo fuera. Si no llegó NADA de contenido se reintenta con espera.
+    if (categoriasFinal.isEmpty() && nombresCanales.isEmpty()) {
+        for (espera in longArrayOf(2_000L, 5_000L)) {
+            delay(espera)
+            categoriasFinal = XtreamClient.obtenerCategoriasLive(cred)
+            if (categoriasFinal.isEmpty()) nombresCanales = XtreamClient.obtenerCanales(cred)?.nombres.orEmpty()
+            if (categoriasFinal.isNotEmpty() || nombresCanales.isNotEmpty()) break
+        }
     }
-    val esLatino = analisis.esLatino
+    val sinContenido = categoriasFinal.isEmpty() && nombresCanales.isEmpty()
+
+    var analisis = analizarContenido(categoriasFinal)
+
+    if (!analisis.esLatino && nombresCanales.isNotEmpty()) {
+        analisis = analizarContenido(categoriasFinal + nombresCanales.take(MUESTRA_CANALES_PARA_LATINO))
+    }
+    // Sin ningún dato de contenido, la zona horaria del servidor (America/Santiago, Bogota...) es la única pista.
+    val esLatino = analisis.esLatino || (sinContenido && zonaHorariaLatina(info.zonaHoraria))
     val porcentaje = analisis.proporcionLatino
 
     return ListaValidada(
@@ -106,3 +124,13 @@ suspend fun validarYEnriquecer(cred: CredencialesXtream, origenChat: String): Li
         esEspana = analisis.esEspana,
     )
 }
+
+private val ZONAS_AMERICA_NO_LATINAS = setOf(
+    "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Phoenix",
+    "America/Anchorage", "America/Detroit", "America/Toronto", "America/Vancouver", "America/Edmonton",
+    "America/Winnipeg", "America/Halifax", "America/St_Johns", "America/Boise", "America/Indiana/Indianapolis",
+)
+
+/** `true` para zonas de América que no son de EE. UU./Canadá (señal débil, solo si no hay contenido que analizar). */
+private fun zonaHorariaLatina(zona: String?): Boolean =
+    zona != null && zona.startsWith("America/") && zona !in ZONAS_AMERICA_NO_LATINAS

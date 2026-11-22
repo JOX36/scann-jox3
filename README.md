@@ -742,6 +742,10 @@ La Bodega tiene un nuevo filtro **Otras** (listas no latinas), junto al de **LAT
 
 El botón **Detener búsqueda** ahora está siempre visible arriba, bajo la barra de progreso (antes aparecía abajo y solo cuando ya había enlaces por validar, así que durante la lectura de mensajes no se veía). Detiene el escaneo y muestra lo encontrado hasta ese momento.
 
+## Etapa 40
+
+**Listas latinas que salían como "Otras".** Cuando varias listas del mismo panel se validaban a la vez, el servidor rechazaba las consultas de categorías, llegaban vacías y la lista quedaba como "no latina" sin serlo. Ahora, si no llega ningún dato de contenido, se reintenta (a los 2 y 5 s); si aun así no hay datos, la zona horaria del servidor (America/Santiago, Bogota…, excluyendo EE. UU./Canadá) sirve de pista. Al **Revalidar** la Bodega, una lista que ya era latina no pasa a "Otras" si la consulta de contenido falló esa vez.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
