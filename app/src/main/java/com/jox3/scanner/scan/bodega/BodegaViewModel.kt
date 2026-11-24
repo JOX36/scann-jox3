@@ -61,6 +61,15 @@ class BodegaViewModel(contexto: Context) : ViewModel() {
         }
     }
 
+    /** Quita de una vez varias listas (selección múltiple de la pantalla). */
+    fun eliminarVarias(entradas: List<EntradaBodega>) {
+        val claves = entradas.map { RepositorioBodega.clave(it.lista.credenciales) }.toSet()
+        if (claves.isEmpty()) return
+        viewModelScope.launch {
+            _entradas.value = withContext(Dispatchers.IO) { RepositorioBodega.eliminar(carpeta, claves) }
+        }
+    }
+
     /** Quita las que ya no responden como activas o ya vencieron. */
     fun limpiarCaidasYVencidas() {
         val claves = _entradas.value

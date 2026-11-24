@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,12 +70,17 @@ fun BodegaScreen(
     revalidacion: EstadoRevalidacion,
     onAbrir: (EntradaBodega) -> Unit,
     onEliminar: (EntradaBodega) -> Unit,
+    onEliminarVarias: (List<EntradaBodega>) -> Unit,
     onRevalidar: () -> Unit,
     onLimpiar: () -> Unit,
 ) {
     var consulta by remember { mutableStateOf("") }
     var filtro by remember { mutableStateOf(FiltroBodega.TODAS) }
     var porBorrar by remember { mutableStateOf<EntradaBodega?>(null) }
+    // Selección múltiple: claves de las listas marcadas; `seleccionando` activa el modo.
+    var seleccionando by remember { mutableStateOf(false) }
+    var marcadas by remember { mutableStateOf(setOf<String>()) }
+    var confirmarVarias by remember { mutableStateOf(false) }
 
     val visibles = remember(entradas, consulta, filtro) {
         val q = consulta.trim().lowercase()
@@ -93,7 +99,10 @@ fun BodegaScreen(
                 e.lista.origenChat.lowercase().contains(q))
         }
     }
+    fun claveDe(e: EntradaBodega) = "${hostDe(e)}|${e.lista.credenciales.username}"
     val grupos = remember(visibles) { visibles.groupBy { hostDe(it) } }
+    // Las marcadas que ya no existen (p. ej. tras borrar) no cuentan.
+    val marcadasVigentes = entradas.filter { claveDe(it) in marcadas }
 
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp)) {
         item {
@@ -119,7 +128,25 @@ fun BodegaScreen(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            if (revalidacion.enCurso) {
+            if (seleccionando) {
+                Text("${marcadasVigentes.size} seleccionada(s)", color = AcentoApp, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = {
+                            val todasVisibles = visibles.map { claveDe(it) }.toSet()
+                            marcadas = if (todasVisibles.all { it in marcadas }) marcadas - todasVisibles else marcadas + todasVisibles
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Todas las visibles") }
+                    Button(
+                        onClick = { confirmarVarias = true },
+                        enabled = marcadasVigentes.isNotEmpty(),
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Eliminar (${marcadasVigentes.size})") }
+                }
+                TextButton(onClick = { seleccionando = false; marcadas = emptySet() }) { Text("Cancelar selección") }
+            } else if (revalidacion.enCurso) {
                 Text("Revalidando… ${revalidacion.hechas}/${revalidacion.total}", color = AcentoApp, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
                 LinearProgressIndicator(
@@ -137,6 +164,7 @@ fun BodegaScreen(
                         modifier = Modifier.weight(1f),
                     ) { Text("Limpiar caídas") }
                 }
+                TextButton(onClick = { seleccionando = true }, enabled = entradas.isNotEmpty()) { Text("☑ Seleccionar varias para eliminar") }
             }
             Spacer(Modifier.height(12.dp))
         }
@@ -167,19 +195,45 @@ fun BodegaScreen(
             }
             items(lista, key = { "${hostDe(it)}|${it.lista.credenciales.username}" }) { entrada ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    val clave = claveDe(entrada)
                     Box(modifier = Modifier.weight(1f)) {
                         FilaResultado(
                             // Días calculados hoy y estado según la última revalidación.
                             entrada.lista.copy(diasRestantes = entrada.lista.diasHoy(), activa = entrada.vigente),
-                            onClick = { onAbrir(entrada) },
+                            onClick = {
+                                if (seleccionando) marcadas = if (clave in marcadas) marcadas - clave else marcadas + clave
+                                else onAbrir(entrada)
+                            },
                         )
                     }
-                    IconButton(onClick = { porBorrar = entrada }) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Quitar de la bodega", tint = ErrorApp.copy(alpha = 0.8f))
+                    if (seleccionando) {
+                        Checkbox(
+                            checked = clave in marcadas,
+                            onCheckedChange = { marcadas = if (clave in marcadas) marcadas - clave else marcadas + clave },
+                        )
+                    } else {
+                        IconButton(onClick = { porBorrar = entrada }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Quitar de la bodega", tint = ErrorApp.copy(alpha = 0.8f))
+                        }
                     }
                 }
             }
         }
+    }
+
+    if (confirmarVarias) {
+        AlertDialog(
+            onDismissRequest = { confirmarVarias = false },
+            title = { Text("¿Quitar ${marcadasVigentes.size} lista(s) de la bodega?") },
+            text = { Text("Se borran de la bodega; esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onEliminarVarias(marcadasVigentes)
+                    confirmarVarias = false; seleccionando = false; marcadas = emptySet()
+                }) { Text("Quitar") }
+            },
+            dismissButton = { TextButton(onClick = { confirmarVarias = false }) { Text("Cancelar") } },
+        )
     }
 
     porBorrar?.let { e ->

@@ -325,6 +325,7 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
                             revalidacion = revalidacion,
                             onAbrir = bodegaViewModel::abrirDetalle,
                             onEliminar = bodegaViewModel::eliminar,
+                            onEliminarVarias = bodegaViewModel::eliminarVarias,
                             onRevalidar = bodegaViewModel::revalidarTodas,
                             onLimpiar = bodegaViewModel::limpiarCaidasYVencidas,
                         )

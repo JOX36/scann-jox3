@@ -746,6 +746,10 @@ El botón **Detener búsqueda** ahora está siempre visible arriba, bajo la barr
 
 **Listas latinas que salían como "Otras".** Cuando varias listas del mismo panel se validaban a la vez, el servidor rechazaba las consultas de categorías, llegaban vacías y la lista quedaba como "no latina" sin serlo. Ahora, si no llega ningún dato de contenido, se reintenta (a los 2 y 5 s); si aun así no hay datos, la zona horaria del servidor (America/Santiago, Bogota…, excluyendo EE. UU./Canadá) sirve de pista. Al **Revalidar** la Bodega, una lista que ya era latina no pasa a "Otras" si la consulta de contenido falló esa vez.
 
+## Etapa 41
+
+**Eliminar varias listas de la Bodega a la vez.** El botón "☑ Seleccionar varias para eliminar" activa el modo selección: cada lista muestra una casilla (tocar la tarjeta también la marca), "Todas las visibles" marca/desmarca todo lo que muestre el filtro o la búsqueda actual (p. ej. todas las "Otras" o un host), y "Eliminar (n)" las quita tras una confirmación.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
