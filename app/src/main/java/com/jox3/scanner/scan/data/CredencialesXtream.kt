@@ -99,12 +99,36 @@ private fun recortarBasuraFinal(enlace: String): String {
     return enlace.substring(0, fin)
 }
 
-fun extraerEnlaces(texto: String): List<String> =
-    patronEnlaceM3U.findAll(limpiarMarkdown(texto))
+fun extraerEnlaces(textoCrudo: String): List<String> {
+    val texto = limpiarMarkdown(textoCrudo)
+    val clasicos = patronEnlaceM3U.findAll(texto)
         .map { recortarBasuraFinal(it.value) }
         .filter { it.contains("get.php?") }
-        .distinct()
-        .toList()
+    // Enlaces por ruta (/playlist/usuario/clave/m3u_plus, /live/usuario/clave/...) pasados a su forma get.php.
+    val porRuta = credencialesDeRuta(texto).map { it.urlOriginal }
+    return (clasicos + porRuta).distinct().toList()
+}
+
+/**
+ * Formato alternativo de los paneles Xtream: el usuario y la clave van en la RUTA, no en la consulta
+ * (`http://host:8080/playlist/USUARIO/CLAVE/m3u_plus`, o `/live|movie|series/USUARIO/CLAVE/...`).
+ */
+private val patronRutaXtream = Regex(
+    """(https?)://([^/\s'"<>`]+)/(?:playlist|live|movie|series)/([^/\s?'"<>`]+)/([^/\s?'"<>`]+)""",
+    RegexOption.IGNORE_CASE,
+)
+
+private fun decodificarRuta(valor: String): String =
+    runCatching { URLDecoder.decode(valor.replace("+", "%2B"), "UTF-8") }.getOrDefault(valor)
+
+internal fun credencialesDeRuta(texto: String): List<CredencialesXtream> =
+    patronRutaXtream.findAll(texto).mapNotNull { m ->
+        val host = "${m.groupValues[1]}://${m.groupValues[2]}"
+        val usuario = decodificarRuta(m.groupValues[3])
+        val clave = decodificarRuta(m.groupValues[4])
+        if (usuario.isBlank() || clave.isBlank()) null
+        else CredencialesXtream(host = host, username = usuario, password = clave, urlOriginal = enlaceM3uDe(host, usuario, clave))
+    }.distinctBy { "${it.host}|${it.username}|${it.password}" }.toList()
 
 private val patronUrlCualquiera = Regex("""https?://[^\s'"<>`]+""", RegexOption.IGNORE_CASE)
 
@@ -129,6 +153,8 @@ fun extraerCredencialesDeTexto(textoCrudo: String): CredencialesXtream? {
         return if (url.contains("get.php?")) cred
         else cred.copy(urlOriginal = enlaceM3uDe(cred.host, cred.username, cred.password))
     }
+
+    credencialesDeRuta(texto).firstOrNull()?.let { return it }
 
     fun armar(hostCrudo: String?, usuario: String?, clave: String?): CredencialesXtream? {
         if (hostCrudo.isNullOrBlank() || usuario.isNullOrBlank() || clave.isNullOrBlank()) return null

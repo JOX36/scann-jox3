@@ -750,6 +750,10 @@ El botón **Detener búsqueda** ahora está siempre visible arriba, bajo la barr
 
 **Eliminar varias listas de la Bodega a la vez.** El botón "☑ Seleccionar varias para eliminar" activa el modo selección: cada lista muestra una casilla (tocar la tarjeta también la marca), "Todas las visibles" marca/desmarca todo lo que muestre el filtro o la búsqueda actual (p. ej. todas las "Otras" o un host), y "Eliminar (n)" las quita tras una confirmación.
 
+## Etapa 42
+
+Se reconoce el formato de **enlace por ruta** de los paneles Xtream: `http://host:8080/playlist/USUARIO/CLAVE/m3u_plus` (y las variantes `/live/`, `/movie/`, `/series/`). Antes el Verificador decía "No encontré host, usuario y contraseña" porque solo buscaba `username=`/`password=` en la consulta. Ahora usuario y clave se sacan de la ruta, y el enlace se convierte a `get.php` para validarlo. También se aplica al escaneo de chats y archivos.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
