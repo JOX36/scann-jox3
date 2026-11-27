@@ -754,6 +754,10 @@ El botón **Detener búsqueda** ahora está siempre visible arriba, bajo la barr
 
 Se reconoce el formato de **enlace por ruta** de los paneles Xtream: `http://host:8080/playlist/USUARIO/CLAVE/m3u_plus` (y las variantes `/live/`, `/movie/`, `/series/`). Antes el Verificador decía "No encontré host, usuario y contraseña" porque solo buscaba `username=`/`password=` en la consulta. Ahora usuario y clave se sacan de la ruta, y el enlace se convierte a `get.php` para validarlo. También se aplica al escaneo de chats y archivos.
 
+## Etapa 43
+
+**Informe de calidad de la Bodega.** En "☑ Seleccionar varias" marca las listas y toca **📊 Analizar calidad**. Por cada lista se miden: respuesta del panel (3 consultas: mediana y variación), arranque y velocidad de un canal en vivo (4 s), vigencia y conexiones permitidas, y se calcula una nota de 0 a 100 (Excelente ≥ 80, Buena ≥ 60, Regular ≥ 40, Floja). El informe se abre solo al terminar y muestra un ranking de **servidores** (promedio por host) y de **listas**, con avisos (conexiones al máximo, flujo lento, por vencer). Se prueba una lista a la vez por servidor para no saturar paneles con pocas conexiones, y la prueba usa una conexión del panel unos segundos. "📊 Ver último informe" lo reabre mientras la app siga en memoria.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

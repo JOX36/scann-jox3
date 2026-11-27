@@ -318,11 +318,17 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
                 Pestana.BODEGA -> {
                     val entradas by bodegaViewModel.entradas.collectAsState()
                     val revalidacion by bodegaViewModel.revalidacion.collectAsState()
+                    val analisisCalidad by bodegaViewModel.analisis.collectAsState()
+                    val informesCalidad by bodegaViewModel.informes.collectAsState()
                     val abierta = detalleBodega
                     if (abierta == null) {
                         com.jox3.scanner.ui.bodega.BodegaScreen(
                             entradas = entradas,
                             revalidacion = revalidacion,
+                            analisis = analisisCalidad,
+                            informes = informesCalidad,
+                            onAnalizar = bodegaViewModel::analizarCalidad,
+                            onCancelarAnalisis = bodegaViewModel::cancelarAnalisis,
                             onAbrir = bodegaViewModel::abrirDetalle,
                             onEliminar = bodegaViewModel::eliminar,
                             onEliminarVarias = bodegaViewModel::eliminarVarias,

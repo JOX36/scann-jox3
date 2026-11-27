@@ -15,11 +15,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicInteger
+
+data class EstadoAnalisis(val enCurso: Boolean = false, val hechas: Int = 0, val total: Int = 0)
 
 data class EstadoRevalidacion(val enCurso: Boolean = false, val hechas: Int = 0, val total: Int = 0)
 
@@ -32,6 +36,13 @@ class BodegaViewModel(contexto: Context) : ViewModel() {
 
     private val _revalidacion = MutableStateFlow(EstadoRevalidacion())
     val revalidacion: StateFlow<EstadoRevalidacion> = _revalidacion.asStateFlow()
+
+    private val _analisis = MutableStateFlow(EstadoAnalisis())
+    val analisis: StateFlow<EstadoAnalisis> = _analisis.asStateFlow()
+    private val _informes = MutableStateFlow<List<InformeCalidad>>(emptyList())
+    val informes: StateFlow<List<InformeCalidad>> = _informes.asStateFlow()
+    private var analisisJob: Job? = null
+    private val candadosPorHost = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
 
     private val _detalleEntrada = MutableStateFlow<EntradaBodega?>(null)
     val detalleEntrada: StateFlow<EntradaBodega?> = _detalleEntrada.asStateFlow()
@@ -107,6 +118,47 @@ class BodegaViewModel(contexto: Context) : ViewModel() {
             _entradas.value = withContext(Dispatchers.IO) { RepositorioBodega.aplicarRevalidacion(carpeta, resultados) }
             _revalidacion.value = EstadoRevalidacion()
         }
+    }
+
+    /**
+     * Mide la calidad de las listas dadas (hasta 4 a la vez, pero de una en una por servidor para no
+     * saturar a un panel con pocas conexiones). Los informes van apareciendo ordenados por nota.
+     */
+    fun analizarCalidad(listas: List<EntradaBodega>) {
+        if (_analisis.value.enCurso || listas.isEmpty()) return
+        _analisis.value = EstadoAnalisis(true, 0, listas.size)
+        _informes.value = emptyList()
+        analisisJob = viewModelScope.launch {
+            val hechas = AtomicInteger(0)
+            val semaforo = Semaphore(4)
+            val acumulado = java.util.Collections.synchronizedList(mutableListOf<InformeCalidad>())
+            try {
+                withContext(Dispatchers.IO) {
+                    listas.map { entrada ->
+                        async {
+                            val candado = candadosPorHost.getOrPut(hostDe(entrada)) { Mutex() }
+                            candado.withLock {
+                                semaforo.withPermit {
+                                    val informe = withTimeoutOrNull(60_000L) { medirCalidad(entrada) }
+                                        ?: informeFallido(entrada, "Se agotó el tiempo de la prueba (60 s).")
+                                    acumulado += informe
+                                    _informes.value = acumulado.toList().sortedByDescending { it.puntaje }
+                                    _analisis.value = EstadoAnalisis(true, hechas.incrementAndGet(), listas.size)
+                                }
+                            }
+                        }
+                    }.awaitAll()
+                }
+            } finally {
+                _analisis.value = EstadoAnalisis()
+            }
+        }
+    }
+
+    /** Detiene la prueba; los informes ya medidos se conservan. */
+    fun cancelarAnalisis() {
+        analisisJob?.cancel()
+        _analisis.value = EstadoAnalisis()
     }
 
     fun abrirDetalle(entrada: EntradaBodega) {

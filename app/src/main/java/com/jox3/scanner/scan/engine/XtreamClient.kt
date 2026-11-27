@@ -442,6 +442,100 @@ object XtreamClient {
         "Europe/London" to "GB",
     )
 
+    /** Resultado de leer unos segundos de un canal en vivo: tiempo hasta recibir datos y velocidad del flujo. */
+    data class MedicionStream(val arranqueMs: Long, val mbps: Double, val bytes: Long)
+
+    private val patronStreamId = Regex(""""stream_id"\s*:\s*"?(\d+)""")
+
+    /**
+     * Ids de los primeros canales en vivo. Lee solo el INICIO de `get_live_streams` (unos KB),
+     * sin descargar el listado entero.
+     */
+    suspend fun idsCanalesMuestra(cred: CredencialesXtream, maximo: Int = 3): List<String> {
+        return try {
+            NetworkModule.cliente.prepareGet(urlPlayerApi(cred)) {
+                parameter("username", cred.username)
+                parameter("password", cred.password)
+                parameter("action", "get_live_streams")
+                timeout { requestTimeoutMillis = 20_000L; socketTimeoutMillis = 15_000L }
+            }.execute { respuesta ->
+                if (!respuesta.status.isSuccess()) {
+                    emptyList()
+                } else {
+                    val canal = respuesta.bodyAsChannel()
+                    val buffer = ByteArray(16_384)
+                    val texto = StringBuilder()
+                    var total = 0
+                    var ids = emptyList<String>()
+                    while (total < 98_304 && ids.size < maximo) {
+                        val n = canal.readAvailable(buffer, 0, buffer.size)
+                        if (n < 0) break
+                        texto.append(String(buffer, 0, n, Charsets.ISO_8859_1))
+                        total += n
+                        ids = patronStreamId.findAll(texto).map { it.groupValues[1] }.distinct().take(maximo).toList()
+                    }
+                    ids
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            emptyList()
+        }
+    }
+
+    /**
+     * Abre el canal [idCanal] en vivo (.ts) y lee hasta [ventanaMs] ms o 2,5 MB: da el tiempo de arranque
+     * (hasta el primer dato) y la velocidad del flujo. `null` si el canal no abre o no manda datos.
+     */
+    suspend fun medirStream(cred: CredencialesXtream, idCanal: String, ventanaMs: Long = 4_000L): MedicionStream? {
+        fun codificar(v: String) = java.net.URLEncoder.encode(v, "UTF-8").replace("+", "%20")
+        return try {
+            val inicio = System.nanoTime()
+            NetworkModule.cliente.prepareGet("${cred.host}/live/${codificar(cred.username)}/${codificar(cred.password)}/$idCanal.ts") {
+                timeout { requestTimeoutMillis = 15_000L; socketTimeoutMillis = 8_000L }
+            }.execute { respuesta ->
+                if (!respuesta.status.isSuccess()) {
+                    null
+                } else {
+                    val canal = respuesta.bodyAsChannel()
+                    val buffer = ByteArray(32_768)
+                    var bytes = 0L
+                    var primerDato = 0L
+                    withTimeoutOrNull(ventanaMs + 8_000L) {
+                        // Espera el primer dato (arranque) y desde ahí mide la ventana.
+                        val n0 = canal.readAvailable(buffer, 0, buffer.size)
+                        if (n0 > 0) {
+                            bytes += n0
+                            primerDato = System.nanoTime()
+                            withTimeoutOrNull(ventanaMs) {
+                                while (bytes < 2_500_000L) {
+                                    val n = canal.readAvailable(buffer, 0, buffer.size)
+                                    if (n < 0) break
+                                    bytes += n
+                                }
+                            }
+                        }
+                    }
+                    if (primerDato == 0L || bytes < 4_096L) {
+                        null
+                    } else {
+                        val segundos = ((System.nanoTime() - primerDato) / 1e9).coerceAtLeast(0.3)
+                        MedicionStream(
+                            arranqueMs = (primerDato - inicio) / 1_000_000L,
+                            mbps = bytes * 8 / segundos / 1_000_000.0,
+                            bytes = bytes,
+                        )
+                    }
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            null
+        }
+    }
+
     fun banderaDesdeTimezone(zona: String?): String =
         banderaDesdeCodigoPais(zona?.let { PAIS_POR_TIMEZONE[it] })
 }
