@@ -139,8 +139,8 @@ class BodegaViewModel(contexto: Context) : ViewModel() {
                             val candado = candadosPorHost.getOrPut(hostDe(entrada)) { Mutex() }
                             candado.withLock {
                                 semaforo.withPermit {
-                                    val informe = withTimeoutOrNull(60_000L) { medirCalidad(entrada) }
-                                        ?: informeFallido(entrada, "Se agotó el tiempo de la prueba (60 s).")
+                                    val informe = withTimeoutOrNull(90_000L) { medirCalidad(entrada) }
+                                        ?: informeFallido(entrada, "Se agotó el tiempo de la prueba (90 s).")
                                     acumulado += informe
                                     _informes.value = acumulado.toList().sortedByDescending { it.puntaje }
                                     _analisis.value = EstadoAnalisis(true, hechas.incrementAndGet(), listas.size)

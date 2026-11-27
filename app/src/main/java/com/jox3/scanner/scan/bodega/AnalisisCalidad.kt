@@ -80,11 +80,18 @@ suspend fun medirCalidad(entrada: EntradaBodega): InformeCalidad {
     if (max != null && activas != null && activas >= max) avisos += "Conexiones al máximo ($activas/$max): puede que no abra canales ahora."
 
     var medicion: XtreamClient.MedicionStream? = null
-    for (id in XtreamClient.idsCanalesMuestra(cred)) {
-        medicion = XtreamClient.medirStream(cred, id)
+    var motivo: String? = null
+    // Los primeros canales suelen ser separadores sin señal: se prueban varios repartidos por la lista.
+    val ids = XtreamClient.idsCanalesMuestra(cred, 12)
+    val candidatos = (ids.filterIndexed { i, _ -> i % 3 == 1 } + ids).distinct().take(3)
+    if (candidatos.isEmpty()) motivo = "no se pudo leer la lista de canales"
+    for (id in candidatos) {
+        val r = XtreamClient.medirStream(cred, id)
+        medicion = r.medicion
         if (medicion != null) break
+        motivo = r.motivo
     }
-    if (medicion == null) avisos += "No se pudo medir la velocidad del canal (no abrió o no mandó datos)."
+    if (medicion == null) avisos += "No se pudo medir la velocidad del canal" + (motivo?.let { " ($it)" } ?: "") + ". La nota es parcial."
     else if (medicion.mbps < 1.0) avisos += "Flujo lento (${"%.1f".format(medicion.mbps)} Mbps): posibles cortes en HD."
 
     val dias = cuenta.diasRestantes
@@ -102,7 +109,9 @@ suspend fun medirCalidad(entrada: EntradaBodega): InformeCalidad {
     partes += estabilidad to 0.15
     partes += (dias?.let { tramo(it.toDouble(), 60.0, 0.0) } ?: 70.0) to 0.20
     partes += (max?.let { tramo(it.toDouble(), 3.0, 1.0) } ?: 60.0) to 0.10
-    val puntaje = (partes.sumOf { it.first * it.second } / partes.sumOf { it.second }).toInt().coerceIn(0, 100)
+    var puntaje = (partes.sumOf { it.first * it.second } / partes.sumOf { it.second }).toInt().coerceIn(0, 100)
+    // Sin medir el canal no se puede asegurar que el servicio sirva: la nota queda limitada.
+    if (medicion == null) puntaje = minOf(puntaje, 70)
 
     return InformeCalidad(
         clave = RepositorioBodega.clave(cred),
@@ -113,6 +122,6 @@ suspend fun medirCalidad(entrada: EntradaBodega): InformeCalidad {
         arranqueMs = medicion?.arranqueMs?.toInt(), mbps = medicion?.mbps,
         diasRestantes = dias, conexionesMax = max, conexionesActivas = activas,
         canales = lista.cantidadCanales, peliculas = lista.cantidadPeliculas, series = lista.cantidadSeries,
-        puntaje = puntaje, veredicto = veredictoDe(puntaje), avisos = avisos,
+        puntaje = puntaje, veredicto = veredictoDe(puntaje) + if (medicion == null) " (parcial)" else "", avisos = avisos,
     )
 }

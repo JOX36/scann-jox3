@@ -758,6 +758,10 @@ Se reconoce el formato de **enlace por ruta** de los paneles Xtream: `http://hos
 
 **Informe de calidad de la Bodega.** En "☑ Seleccionar varias" marca las listas y toca **📊 Analizar calidad**. Por cada lista se miden: respuesta del panel (3 consultas: mediana y variación), arranque y velocidad de un canal en vivo (4 s), vigencia y conexiones permitidas, y se calcula una nota de 0 a 100 (Excelente ≥ 80, Buena ≥ 60, Regular ≥ 40, Floja). El informe se abre solo al terminar y muestra un ranking de **servidores** (promedio por host) y de **listas**, con avisos (conexiones al máximo, flujo lento, por vencer). Se prueba una lista a la vez por servidor para no saturar paneles con pocas conexiones, y la prueba usa una conexión del panel unos segundos. "📊 Ver último informe" lo reabre mientras la app siga en memoria.
 
+## Etapa 44
+
+**Informe de calidad más honesto.** Una lista a la que no se pudo medir el canal salía con nota 100 porque ese componente simplemente se omitía. Ahora la nota queda limitada a 70 y el veredicto dice "(parcial)". Además la medición es más robusta: prueba varios canales repartidos por la lista (los primeros suelen ser separadores sin señal), usa un agente de reproductor, y si el flujo `.ts` no abre prueba la lista HLS (`.m3u8`). Cuando aun así no se puede, el aviso dice el motivo (HTTP 403, sin datos, tiempo agotado…).
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el

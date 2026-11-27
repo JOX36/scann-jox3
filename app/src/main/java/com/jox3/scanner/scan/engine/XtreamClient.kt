@@ -5,9 +5,12 @@ import com.jox3.scanner.update.NetworkModule
 import io.ktor.client.call.body
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.request
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
@@ -484,26 +487,64 @@ object XtreamClient {
         }
     }
 
+    /** Resultado de medir un canal: la [medicion], o el [motivo] por el que no se pudo (HTTP 403, sin datos...). */
+    data class ResultadoStream(val medicion: MedicionStream?, val motivo: String? = null)
+
+    private const val AGENTE_REPRODUCTOR = "VLC/3.0.18 LibVLC/3.0.18"
+
     /**
-     * Abre el canal [idCanal] en vivo (.ts) y lee hasta [ventanaMs] ms o 2,5 MB: da el tiempo de arranque
-     * (hasta el primer dato) y la velocidad del flujo. `null` si el canal no abre o no manda datos.
+     * Mide un canal en vivo: prueba el flujo `.ts` y, si el panel no lo entrega, la lista HLS (`.m3u8`)
+     * con su primer fragmento. Lee hasta [ventanaMs] ms o 2,5 MB y da el arranque y la velocidad.
      */
-    suspend fun medirStream(cred: CredencialesXtream, idCanal: String, ventanaMs: Long = 4_000L): MedicionStream? {
+    suspend fun medirStream(cred: CredencialesXtream, idCanal: String, ventanaMs: Long = 4_000L): ResultadoStream {
         fun codificar(v: String) = java.net.URLEncoder.encode(v, "UTF-8").replace("+", "%20")
+        val base = "${cred.host}/live/${codificar(cred.username)}/${codificar(cred.password)}/$idCanal"
+        val ts = leerFlujo("$base.ts", ventanaMs, System.nanoTime())
+        if (ts.medicion != null) return ts
+        val hls = medirHls("$base.m3u8", ventanaMs)
+        if (hls.medicion != null) return hls
+        return ResultadoStream(null, "ts: ${ts.motivo ?: "?"} · hls: ${hls.motivo ?: "?"}")
+    }
+
+    private suspend fun medirHls(urlLista: String, ventanaMs: Long): ResultadoStream {
         return try {
             val inicio = System.nanoTime()
-            NetworkModule.cliente.prepareGet("${cred.host}/live/${codificar(cred.username)}/${codificar(cred.password)}/$idCanal.ts") {
-                timeout { requestTimeoutMillis = 15_000L; socketTimeoutMillis = 8_000L }
+            var url = urlLista
+            // Hasta dos niveles: lista maestra -> lista de fragmentos -> fragmento.
+            repeat(3) {
+                val respuesta = NetworkModule.cliente.get(url) {
+                    header("User-Agent", AGENTE_REPRODUCTOR)
+                    timeout { requestTimeoutMillis = 10_000L; socketTimeoutMillis = 6_000L }
+                }
+                if (!respuesta.status.isSuccess()) return ResultadoStream(null, "HTTP ${respuesta.status.value}")
+                val texto = respuesta.bodyAsText()
+                val destino = texto.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() && !it.startsWith("#") }
+                    ?: return ResultadoStream(null, "lista vacía")
+                url = java.net.URI(respuesta.request.url.toString()).resolve(destino).toString()
+                if (!destino.contains(".m3u8")) return leerFlujo(url, ventanaMs, inicio)
+            }
+            ResultadoStream(null, "lista sin fragmentos")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            ResultadoStream(null, e.javaClass.simpleName)
+        }
+    }
+
+    private suspend fun leerFlujo(url: String, ventanaMs: Long, inicio: Long): ResultadoStream {
+        return try {
+            NetworkModule.cliente.prepareGet(url) {
+                header("User-Agent", AGENTE_REPRODUCTOR)
+                timeout { requestTimeoutMillis = 12_000L; socketTimeoutMillis = 6_000L }
             }.execute { respuesta ->
                 if (!respuesta.status.isSuccess()) {
-                    null
+                    ResultadoStream(null, "HTTP ${respuesta.status.value}")
                 } else {
                     val canal = respuesta.bodyAsChannel()
                     val buffer = ByteArray(32_768)
                     var bytes = 0L
                     var primerDato = 0L
-                    withTimeoutOrNull(ventanaMs + 8_000L) {
-                        // Espera el primer dato (arranque) y desde ahí mide la ventana.
+                    withTimeoutOrNull(ventanaMs + 6_000L) {
                         val n0 = canal.readAvailable(buffer, 0, buffer.size)
                         if (n0 > 0) {
                             bytes += n0
@@ -518,13 +559,15 @@ object XtreamClient {
                         }
                     }
                     if (primerDato == 0L || bytes < 4_096L) {
-                        null
+                        ResultadoStream(null, if (primerDato == 0L) "sin datos" else "muy pocos datos")
                     } else {
                         val segundos = ((System.nanoTime() - primerDato) / 1e9).coerceAtLeast(0.3)
-                        MedicionStream(
-                            arranqueMs = (primerDato - inicio) / 1_000_000L,
-                            mbps = bytes * 8 / segundos / 1_000_000.0,
-                            bytes = bytes,
+                        ResultadoStream(
+                            MedicionStream(
+                                arranqueMs = (primerDato - inicio) / 1_000_000L,
+                                mbps = bytes * 8 / segundos / 1_000_000.0,
+                                bytes = bytes,
+                            ),
                         )
                     }
                 }
@@ -532,7 +575,7 @@ object XtreamClient {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            null
+            ResultadoStream(null, e.javaClass.simpleName)
         }
     }
 
