@@ -320,6 +320,8 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
                     val revalidacion by bodegaViewModel.revalidacion.collectAsState()
                     val analisisCalidad by bodegaViewModel.analisis.collectAsState()
                     val informesCalidad by bodegaViewModel.informes.collectAsState()
+                    val avisoCalidad by bodegaViewModel.aviso.collectAsState()
+                    val seccionBodega by bodegaViewModel.seccion.collectAsState()
                     val abierta = detalleBodega
                     if (abierta == null) {
                         com.jox3.scanner.ui.bodega.BodegaScreen(
@@ -327,6 +329,11 @@ private fun PantallaPrincipal(authClient: TdLibAuthClient) {
                             revalidacion = revalidacion,
                             analisis = analisisCalidad,
                             informes = informesCalidad,
+                            aviso = avisoCalidad,
+                            seccion = seccionBodega,
+                            onSeccion = bodegaViewModel::elegirSeccion,
+                            onRemedir = bodegaViewModel::remedir,
+                            onQuitarInforme = { bodegaViewModel.quitarInforme(it.clave) },
                             onAnalizar = bodegaViewModel::analizarCalidad,
                             onCancelarAnalisis = bodegaViewModel::cancelarAnalisis,
                             onAbrir = bodegaViewModel::abrirDetalle,

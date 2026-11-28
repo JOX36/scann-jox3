@@ -3,8 +3,14 @@ package com.jox3.scanner.scan.bodega
 import com.jox3.scanner.scan.engine.InfoCuentaXtream
 import com.jox3.scanner.scan.engine.XtreamClient
 import kotlinx.coroutines.delay
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.io.File
 
-/** Informe de calidad de una lista de la Bodega (ver [medirCalidad]). */
+/** Informe de calidad de una lista de la Bodega (ver [medirCalidad]). Se guarda en el teléfono. */
+@Serializable
 data class InformeCalidad(
     val clave: String,
     val host: String,
@@ -26,6 +32,9 @@ data class InformeCalidad(
     val puntaje: Int,
     val veredicto: String,
     val avisos: List<String>,
+    val esLatino: Boolean = false,
+    /** Cuándo se midió (ms desde 1970). */
+    val medidoEn: Long = 0L,
 )
 
 /** 100 cuando [v] llega a [mejor], 0 cuando llega a [peor] (sirve en ambos sentidos), lineal en medio. */
@@ -48,6 +57,7 @@ fun informeFallido(entrada: EntradaBodega, motivo: String) = InformeCalidad(
     diasRestantes = entrada.lista.diasHoy(), conexionesMax = null, conexionesActivas = null,
     canales = entrada.lista.cantidadCanales, peliculas = entrada.lista.cantidadPeliculas, series = entrada.lista.cantidadSeries,
     puntaje = 0, veredicto = "Sin respuesta", avisos = listOf(motivo),
+    esLatino = entrada.lista.esLatino, medidoEn = System.currentTimeMillis(),
 )
 
 /**
@@ -123,5 +133,28 @@ suspend fun medirCalidad(entrada: EntradaBodega): InformeCalidad {
         diasRestantes = dias, conexionesMax = max, conexionesActivas = activas,
         canales = lista.cantidadCanales, peliculas = lista.cantidadPeliculas, series = lista.cantidadSeries,
         puntaje = puntaje, veredicto = veredictoDe(puntaje) + if (medicion == null) " (parcial)" else "", avisos = avisos,
+        esLatino = lista.esLatino, medidoEn = System.currentTimeMillis(),
     )
+}
+
+/**
+ * Informes de calidad guardados (`calidad.json`, junto a la Bodega): las listas ya verificadas quedan
+ * disponibles para elegir en cualquier momento sin volver a medirlas.
+ */
+object RepositorioCalidad {
+    private const val ARCHIVO = "calidad.json"
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val candado = Any()
+
+    fun cargar(carpeta: File): List<InformeCalidad> = synchronized(candado) {
+        val f = File(carpeta, ARCHIVO)
+        if (!f.exists()) return emptyList()
+        runCatching { json.decodeFromString<List<InformeCalidad>>(f.readText()) }.getOrDefault(emptyList())
+    }
+
+    fun guardar(carpeta: File, informes: List<InformeCalidad>) = synchronized(candado) {
+        val tmp = File(carpeta, "$ARCHIVO.tmp")
+        tmp.writeText(json.encodeToString(informes))
+        tmp.renameTo(File(carpeta, ARCHIVO))
+    }
 }

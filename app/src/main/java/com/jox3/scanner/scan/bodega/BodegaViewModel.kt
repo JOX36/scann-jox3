@@ -9,11 +9,13 @@ import com.jox3.scanner.scan.engine.consultarDetalleLista
 import com.jox3.scanner.scan.engine.validarYEnriquecer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -39,8 +41,16 @@ class BodegaViewModel(contexto: Context) : ViewModel() {
 
     private val _analisis = MutableStateFlow(EstadoAnalisis())
     val analisis: StateFlow<EstadoAnalisis> = _analisis.asStateFlow()
+    /** Informes de calidad guardados (listas ya verificadas), de mejor a peor nota. */
     private val _informes = MutableStateFlow<List<InformeCalidad>>(emptyList())
     val informes: StateFlow<List<InformeCalidad>> = _informes.asStateFlow()
+    private var informesCargados = false
+    private val _aviso = MutableStateFlow<String?>(null)
+    val aviso: StateFlow<String?> = _aviso.asStateFlow()
+    /** 0 = todas las listas, 1 = verificadas (se recuerda al abrir el detalle de una lista). */
+    private val _seccion = MutableStateFlow(0)
+    val seccion: StateFlow<Int> = _seccion.asStateFlow()
+    fun elegirSeccion(i: Int) { _seccion.value = i }
     private var analisisJob: Job? = null
     private val candadosPorHost = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
 
@@ -54,7 +64,27 @@ class BodegaViewModel(contexto: Context) : ViewModel() {
     private var revalidarJob: Job? = null
 
     init {
-        refrescar()
+        viewModelScope.launch {
+            val (listas, guardados) = withContext(Dispatchers.IO) {
+                RepositorioBodega.cargar(carpeta) to RepositorioCalidad.cargar(carpeta)
+            }
+            _entradas.value = listas
+            _informes.value = guardados.sortedByDescending { it.puntaje }
+            informesCargados = true
+        }
+        // Un informe solo sirve mientras su lista siga en la Bodega (de ahí salen las credenciales).
+        viewModelScope.launch {
+            _entradas.collect { lista ->
+                if (!informesCargados) return@collect
+                val claves = lista.map { RepositorioBodega.clave(it.lista.credenciales) }.toSet()
+                val antes = _informes.value
+                val despues = antes.filter { it.clave in claves }
+                if (despues.size != antes.size) {
+                    _informes.value = despues
+                    withContext(Dispatchers.IO) { RepositorioCalidad.guardar(carpeta, despues) }
+                }
+            }
+        }
     }
 
     /** Vuelve a leer el archivo (los escaneos guardan por su cuenta; se llama al abrir la pestaña). */
@@ -122,16 +152,18 @@ class BodegaViewModel(contexto: Context) : ViewModel() {
 
     /**
      * Mide la calidad de las listas dadas (hasta 4 a la vez, pero de una en una por servidor para no
-     * saturar a un panel con pocas conexiones). Los informes van apareciendo ordenados por nota.
+     * saturar a un panel con pocas conexiones). Cada informe se guarda: la lista queda en "Verificadas"
+     * y no hace falta medirla otra vez.
      */
     fun analizarCalidad(listas: List<EntradaBodega>) {
         if (_analisis.value.enCurso || listas.isEmpty()) return
         _analisis.value = EstadoAnalisis(true, 0, listas.size)
-        _informes.value = emptyList()
+        _aviso.value = null
         analisisJob = viewModelScope.launch {
             val hechas = AtomicInteger(0)
             val semaforo = Semaphore(4)
-            val acumulado = java.util.Collections.synchronizedList(mutableListOf<InformeCalidad>())
+            var sinRespuesta = 0
+            var medidas = 0
             try {
                 withContext(Dispatchers.IO) {
                     listas.map { entrada ->
@@ -141,8 +173,14 @@ class BodegaViewModel(contexto: Context) : ViewModel() {
                                 semaforo.withPermit {
                                     val informe = withTimeoutOrNull(90_000L) { medirCalidad(entrada) }
                                         ?: informeFallido(entrada, "Se agotó el tiempo de la prueba (90 s).")
-                                    acumulado += informe
-                                    _informes.value = acumulado.toList().sortedByDescending { it.puntaje }
+                                    if (informe.respuestaMs != null) {
+                                        synchronized(this@BodegaViewModel) { medidas++ }
+                                        _informes.update { previos ->
+                                            (previos.filter { it.clave != informe.clave } + informe).sortedByDescending { it.puntaje }
+                                        }
+                                    } else {
+                                        synchronized(this@BodegaViewModel) { sinRespuesta++ }
+                                    }
                                     _analisis.value = EstadoAnalisis(true, hechas.incrementAndGet(), listas.size)
                                 }
                             }
@@ -150,15 +188,28 @@ class BodegaViewModel(contexto: Context) : ViewModel() {
                     }.awaitAll()
                 }
             } finally {
+                withContext(NonCancellable + Dispatchers.IO) { RepositorioCalidad.guardar(carpeta, _informes.value) }
+                _aviso.value = "Medidas: $medidas" + if (sinRespuesta > 0) " · sin respuesta: $sinRespuesta (no se guardan)" else ""
                 _analisis.value = EstadoAnalisis()
+                _seccion.value = 1
             }
         }
+    }
+
+    /** Vuelve a medir una lista ya verificada (los datos cambian con el tiempo). */
+    fun remedir(informe: InformeCalidad) {
+        val entrada = _entradas.value.firstOrNull { RepositorioBodega.clave(it.lista.credenciales) == informe.clave } ?: return
+        analizarCalidad(listOf(entrada))
+    }
+
+    fun quitarInforme(clave: String) {
+        _informes.update { it.filter { x -> x.clave != clave } }
+        viewModelScope.launch(Dispatchers.IO) { RepositorioCalidad.guardar(carpeta, _informes.value) }
     }
 
     /** Detiene la prueba; los informes ya medidos se conservan. */
     fun cancelarAnalisis() {
         analisisJob?.cancel()
-        _analisis.value = EstadoAnalisis()
     }
 
     fun abrirDetalle(entrada: EntradaBodega) {

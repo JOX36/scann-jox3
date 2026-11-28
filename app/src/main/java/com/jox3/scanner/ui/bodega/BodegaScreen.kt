@@ -2,6 +2,7 @@ package com.jox3.scanner.ui.bodega
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,7 +27,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +40,7 @@ import com.jox3.scanner.scan.bodega.EntradaBodega
 import com.jox3.scanner.scan.bodega.EstadoAnalisis
 import com.jox3.scanner.scan.bodega.EstadoRevalidacion
 import com.jox3.scanner.scan.bodega.InformeCalidad
+import com.jox3.scanner.scan.bodega.RepositorioBodega
 import com.jox3.scanner.scan.bodega.diasHoy
 import com.jox3.scanner.scan.bodega.hostDe
 import com.jox3.scanner.scan.bodega.ordenarBodega
@@ -73,6 +74,9 @@ fun BodegaScreen(
     revalidacion: EstadoRevalidacion,
     analisis: EstadoAnalisis,
     informes: List<InformeCalidad>,
+    aviso: String?,
+    seccion: Int,
+    onSeccion: (Int) -> Unit,
     onAbrir: (EntradaBodega) -> Unit,
     onEliminar: (EntradaBodega) -> Unit,
     onEliminarVarias: (List<EntradaBodega>) -> Unit,
@@ -80,21 +84,42 @@ fun BodegaScreen(
     onLimpiar: () -> Unit,
     onAnalizar: (List<EntradaBodega>) -> Unit,
     onCancelarAnalisis: () -> Unit,
+    onRemedir: (InformeCalidad) -> Unit,
+    onQuitarInforme: (InformeCalidad) -> Unit,
 ) {
-    var verInforme by remember { mutableStateOf(false) }
-    var vioAnalisis by remember { mutableStateOf(false) }
-    // Al terminar (o detener) una prueba se abre el informe solo.
-    LaunchedEffect(analisis.enCurso) {
-        if (analisis.enCurso) vioAnalisis = true
-        else if (vioAnalisis) { vioAnalisis = false; if (informes.isNotEmpty()) verInforme = true }
-    }
-    if (verInforme) {
-        InformeCalidadScreen(informes = informes, onVolver = { verInforme = false })
-    } else {
-        BodegaLista(
-            entradas, revalidacion, analisis, informes, onAbrir, onEliminar, onEliminarVarias, onRevalidar, onLimpiar,
-            onAnalizar, onCancelarAnalisis, onVerInforme = { verInforme = true },
-        )
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp),
+        ) {
+            FilterChip(selected = seccion == 0, onClick = { onSeccion(0) }, label = { Text("Todas (${entradas.size})") })
+            FilterChip(selected = seccion == 1, onClick = { onSeccion(1) }, label = { Text("📊 Verificadas (${informes.size})") })
+        }
+        // Progreso de la medición visible en ambas secciones.
+        if (analisis.enCurso) {
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
+                Text("Analizando calidad… ${analisis.hechas}/${analisis.total}", color = AcentoApp, fontSize = 12.sp)
+                Spacer(Modifier.height(4.dp))
+                LinearProgressIndicator(
+                    progress = if (analisis.total > 0) analisis.hechas.toFloat() / analisis.total else 0f,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(onClick = onCancelarAnalisis) { Text("Detener (lo medido se conserva)") }
+            }
+        }
+        Box(Modifier.weight(1f)) {
+            if (seccion == 1) {
+                CalidadScreen(
+                    informes = informes, entradas = entradas, aviso = aviso, analizando = analisis.enCurso,
+                    onAbrir = onAbrir, onRemedir = onRemedir, onQuitar = onQuitarInforme,
+                )
+            } else {
+                BodegaLista(
+                    entradas, revalidacion, analisis, informes.map { it.clave }.toSet(), onAbrir, onEliminar, onEliminarVarias,
+                    onRevalidar, onLimpiar, onAnalizar,
+                )
+            }
+        }
     }
 }
 
@@ -103,15 +128,13 @@ private fun BodegaLista(
     entradas: List<EntradaBodega>,
     revalidacion: EstadoRevalidacion,
     analisis: EstadoAnalisis,
-    informes: List<InformeCalidad>,
+    verificadas: Set<String>,
     onAbrir: (EntradaBodega) -> Unit,
     onEliminar: (EntradaBodega) -> Unit,
     onEliminarVarias: (List<EntradaBodega>) -> Unit,
     onRevalidar: () -> Unit,
     onLimpiar: () -> Unit,
     onAnalizar: (List<EntradaBodega>) -> Unit,
-    onCancelarAnalisis: () -> Unit,
-    onVerInforme: () -> Unit,
 ) {
     var consulta by remember { mutableStateOf("") }
     var filtro by remember { mutableStateOf(FiltroBodega.TODAS) }
@@ -168,13 +191,7 @@ private fun BodegaLista(
             }
             Spacer(Modifier.height(8.dp))
             if (analisis.enCurso) {
-                Text("Analizando calidad… ${analisis.hechas}/${analisis.total}", color = AcentoApp, fontSize = 12.sp)
-                Spacer(Modifier.height(4.dp))
-                LinearProgressIndicator(
-                    progress = if (analisis.total > 0) analisis.hechas.toFloat() / analisis.total else 0f,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                TextButton(onClick = onCancelarAnalisis) { Text("Detener y ver lo analizado") }
+                Text("Midiendo calidad… puedes seguir usando la app.", color = TextoSecundario, fontSize = 12.sp)
             } else if (seleccionando) {
                 Text("${marcadasVigentes.size} seleccionada(s)", color = AcentoApp, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
@@ -192,14 +209,17 @@ private fun BodegaLista(
                         modifier = Modifier.weight(1f),
                     ) { Text("Eliminar (${marcadasVigentes.size})") }
                 }
+                val pendientes = marcadasVigentes.filter { RepositorioBodega.clave(it.lista.credenciales) !in verificadas }
+                val omitidas = marcadasVigentes.size - pendientes.size
                 Button(
                     onClick = {
-                        onAnalizar(marcadasVigentes)
+                        onAnalizar(pendientes)
                         seleccionando = false; marcadas = emptySet()
                     },
-                    enabled = marcadasVigentes.isNotEmpty(),
+                    enabled = pendientes.isNotEmpty(),
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("📊 Analizar calidad (${marcadasVigentes.size})") }
+                ) { Text(if (marcadasVigentes.isNotEmpty() && pendientes.isEmpty()) "Ya están verificadas" else "📊 Analizar calidad (${pendientes.size})") }
+                if (omitidas > 0) Text("$omitidas ya verificada(s) se omiten: están en «Verificadas».", color = TextoSecundario, fontSize = 11.sp)
                 TextButton(onClick = { seleccionando = false; marcadas = emptySet() }) { Text("Cancelar selección") }
             } else if (revalidacion.enCurso) {
                 Text("Revalidando… ${revalidacion.hechas}/${revalidacion.total}", color = AcentoApp, fontSize = 12.sp)
@@ -220,7 +240,6 @@ private fun BodegaLista(
                     ) { Text("Limpiar caídas") }
                 }
                 TextButton(onClick = { seleccionando = true }, enabled = entradas.isNotEmpty()) { Text("☑ Seleccionar varias (analizar / eliminar)") }
-                if (informes.isNotEmpty()) TextButton(onClick = onVerInforme) { Text("📊 Ver último informe de calidad") }
             }
             Spacer(Modifier.height(12.dp))
         }

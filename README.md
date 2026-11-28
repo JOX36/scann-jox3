@@ -762,6 +762,10 @@ Se reconoce el formato de **enlace por ruta** de los paneles Xtream: `http://hos
 
 **Informe de calidad más honesto.** Una lista a la que no se pudo medir el canal salía con nota 100 porque ese componente simplemente se omitía. Ahora la nota queda limitada a 70 y el veredicto dice "(parcial)". Además la medición es más robusta: prueba varios canales repartidos por la lista (los primeros suelen ser separadores sin señal), usa un agente de reproductor, y si el flujo `.ts` no abre prueba la lista HLS (`.m3u8`). Cuando aun así no se puede, el aviso dice el motivo (HTTP 403, sin datos, tiempo agotado…).
 
+## Etapa 45
+
+**Sección "📊 Verificadas" en la Bodega.** Los informes de calidad ya no se pierden: se guardan en el teléfono (`calidad.json`) y las listas medidas quedan en una sección propia, con búsqueda, filtros (Todas / LATAM / Otras / Buenas o mejores), ranking de servidores y de listas, cuándo se midió cada una y un aviso si la Bodega la marca caída o vencida. Para no repetir pruebas, "Analizar calidad" omite las ya verificadas; cada tarjeta tiene "↻ Volver a medir" y "🗑 Quitar", y tocarla abre la información completa. Si una lista sale de la Bodega, su informe se elimina. Las listas que no responden no se guardan. El progreso de la medición se ve en ambas secciones y se puede detener sin perder lo medido.
+
 ## Nota sobre el CI
 
 El workflow de GitHub Actions (`.github/workflows/build.yml`) compila el
